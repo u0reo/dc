@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  vaultwarden:
+    # https://hub.docker.com/r/vaultwarden/server
+    container_name: vaultwarden
+    hostname: vaultwarden-server
+    image: vaultwarden/server:alpine
+    restart: on-failure
+    ports:
+      - 8665:80
+      - 8666:3012
+    volumes:
+      - vaultwarden-data:/data:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+    environment:
+      WEBSOCKET_ENABLED: true
+      DATABASE_URL: $DATABASE_URL
+      DOMAIN: $DOMAIN
+      SMTP_HOST: $SMTP_HOST
+      SMTP_FROM: $SMTP_FROM
+      SMTP_PORT: 465
+      SMTP_SECURITY: force_tls
+      SMTP_USERNAME: $SMTP_FROM
+      SMTP_PASSWORD: $SMTP_PASSWORD
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  vaultwarden-backup:
+    # https://registry.hub.docker.com/r/bruceforce/vaultwarden-backup
+    container_name: vaultwarden-backup
+    image: bruceforce/vaultwarden-backup:latest
+    restart: on-failure
+    network_mode: none
+    depends_on:
+      - vaultwarden
+    volumes:
+      - vaultwarden-data:/data:ro
+      - /var/backup/vaultwarden:/backup:rw
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      BACKUP_DIR: /backup
+      TIMESTAMP: true
+      DELETE_AFTER: 30
+
+volumes:
+  vaultwarden-data:
+    name: vaultwarden-data
+    driver: local
