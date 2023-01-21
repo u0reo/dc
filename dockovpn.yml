@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  dockovpn:
+    # https://hub.docker.com/r/alekslitvinenk/openvpn
+    container_name: dockovpn
+    hostname: dockovpn
+    # build: https://github.com/dockovpn/dockovpn.git
+    image: dockovpn
+    restart: on-failure
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 123:1194/udp
+      - 6879:8080
+    volumes:
+      - dockovpn-data:/opt/Dockovpn_data:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      HOST_ADDR: $HOST_ADDR
+      HOST_TUN_PORT: 123
+
+volumes:
+  dockovpn-data:
+    name: dockovpn-data
+    driver: local
