@@ -46,6 +46,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     environment:
+      BACKUP_ADD_DATABASE: false
       BACKUP_DIR: /backup
       TIMESTAMP: true
       DELETE_AFTER: 30
