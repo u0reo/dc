@@ -1,0 +1,81 @@
+version: '3.9'
+
+services:
+  web:
+    image: standardnotes/web:stable
+    container_name: standardnotes-web
+    ports: # SW -> ASCII Codes (HEX)
+      - 29527:3001
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      PORT: 3001
+      DEFAULT_SYNC_SERVER: $API_SERVER_URL
+      DASHBOARD_URL: $WEB_SERVER_URL/dashboard
+      PLANS_URL: $WEB_SERVER_URL/plans
+      PURCHASE_URL: $WEB_SERVER_URL/purchase
+      SECRET_KEY_BASE: $SECRET_KEY_BASE
+
+  server:
+    image: standardnotes/server
+    container_name: standardnotes-server
+    ports: # SS -> ASCII Codes (HEX)
+      - 29555:3000 # API
+      - 29556:3104 # Files
+      # - 8386:3101 # Syncing
+      # - 8387:3103 # Auth
+      # - 8388:3105 # Revisions
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+      - /var/log/standardnotes:/var/lib/server/logs:rw
+      - standardnotes-uploads:/opt/bundled/files/packages/files/dist/uploads:rw
+      # Get from https://raw.githubusercontent.com/standardnotes/server/main/docker/docker-entrypoint.sh
+      # Then insert at the beginning
+      # find -name DataSource.js -print0 | xargs -0 sed -i -e "s/port: inReplicaMode ? undefined : parseInt(env.get('DB_PORT'))/extra: { socketPath: env.get('DB_SOCKET_PATH') }/"
+      # find -name supervisor-server.sh -print0 | xargs -0 sed -i -e "s/sh supervisor\/wait-for.sh \$DB_HOST \$DB_PORT/\# sh supervisor\/wait-for.sh \$DB_HOST \$DB_PORT/"
+      - /root/standardnotes/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    environment:
+      DB_SOCKET_PATH: /tmp/mysql.sock
+      DB_HOST: host.docker.internal # Not Use
+      DB_PORT: 3306 # Not Use
+      DB_USERNAME: standardnotes
+      DB_PASSWORD: $DB_PASSWORD
+      DB_DATABASE: standardnotes
+      REDIS_HOST: host.docker.internal # Comment out "bind 127.0.0.1 ::1" in /etc/redis/redis.conf
+      REDIS_PORT: 6379
+      AUTH_JWT_SECRET: $AUTH_JWT_SECRET
+      AUTH_SERVER_ENCRYPTION_SERVER_KEY: $AUTH_SERVER_ENCRYPTION_SERVER_KEY
+      VALET_TOKEN_SECRET: $VALET_TOKEN_SECRET
+      PUBLIC_FILES_SERVER_URL: $PUBLIC_FILES_SERVER_URL
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      - standardnotes-network
+
+  localstack:
+    image: localstack/localstack:1.3
+    container_name: standardnotes-localstack
+    expose:
+      - 4566
+    restart: unless-stopped
+    environment:
+      SERVICES: sns,sqs
+      HOSTNAME_EXTERNAL: localstack
+      LS_LOG: warn
+    volumes:
+      # Get from https://raw.githubusercontent.com/standardnotes/server/main/docker/localstack_bootstrap.sh
+      - /root/standardnotes/localstack_bootstrap.sh:/etc/localstack/init/ready.d/localstack_bootstrap.sh:ro
+    networks:
+      - standardnotes-network
+
+volumes:
+  standardnotes-uploads:
+    name: standardnotes-uploads
+    driver: local
+
+networks:
+  standardnotes-network:
+    name: standardnotes-network
