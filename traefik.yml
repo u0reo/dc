@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  traefik:
+    container_name: traefik
+    hostname: traefik
+    image: traefik:v2.10
+    restart: unless-stopped
+    network_mode: bridge
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    expose:
+      - 8080
+    ports:
+      - 80:80/tcp # HTTP
+      - 443:443/tcp # HTTPS
+      - 443:443/udp # HTTPS3
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/traefik:/etc/traefik:ro
+      - $CERT_PATH:/certs:ro
+    labels:
+      traefik.enable: true
+      traefik.http.routers.traefik.rule: Host(`traefik.$DOMAIN`)
+      traefik.http.routers.traefik.entrypoints: https
+      traefik.http.routers.traefik.tls: true
+      traefik.http.routers.traefik.middlewares: authelia@docker
+      traefik.http.routers.traefik.service: dashboard@internal
+    command:
+      - --api # API/ダッシュボードを有効化
+      - --entrypoints.http=true # HTTPで待ち受け
+      - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
+      - --entrypoints.http.http.redirections.entrypoint.to=https # HTTPはHTPSにリダイレクト
+      - --entrypoints.http.http.redirections.entrypoint.scheme=https # HTTPはHTPSにリダイレクト
+      - --entrypoints.https=true # HTTPSで待ち受け
+      - --entrypoints.https.address=:443 # HTTPSは443ポートで待ち受け
+      - --entrypoints.https.http3=true # HTTP3対応
+      - --experimental.http3=true # 試験的なHTTP3対応の有効化
+      - --log=true # ログの出力を有効化
+      - --log.level=INFO # ログのレベルを設定
+      - --log.filepath # ログの出力先を標準出力に
+      - --providers.docker=true # Dockerサポートを有効化
+      - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
+      - --providers.file=true # ファイルサポートを有効化
+      - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
+      - --providers.file.watch=true # 動的構成ファイルの変更を監視
