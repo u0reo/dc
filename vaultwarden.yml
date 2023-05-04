@@ -18,12 +18,12 @@ services:
     environment:
       WEBSOCKET_ENABLED: true
       DATABASE_URL: $DATABASE_URL
-      DOMAIN: $DOMAIN
+      DOMAIN: $ADDRESS
       SMTP_HOST: $SMTP_HOST
       SMTP_FROM: $SMTP_FROM
       SMTP_PORT: 465
       SMTP_SECURITY: force_tls
-      SMTP_USERNAME: $SMTP_FROM
+      SMTP_USERNAME: $SMTP_USERNAME
       SMTP_PASSWORD: $SMTP_PASSWORD
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
@@ -32,24 +32,24 @@ services:
       retries: 3
       start_period: 30s
 
-  vaultwarden-backup:
-    # https://registry.hub.docker.com/r/bruceforce/vaultwarden-backup
-    container_name: vaultwarden-backup
-    image: bruceforce/vaultwarden-backup:latest
-    restart: on-failure
-    network_mode: none
-    depends_on:
-      - vaultwarden
-    volumes:
-      - vaultwarden-data:/data:ro
-      - /var/backup/vaultwarden:/backup:rw
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      BACKUP_ADD_DATABASE: false
-      BACKUP_DIR: /backup
-      TIMESTAMP: true
-      DELETE_AFTER: 30
+  # vaultwarden-backup:
+  #   # https://registry.hub.docker.com/r/bruceforce/vaultwarden-backup
+  #   container_name: vaultwarden-backup
+  #   image: bruceforce/vaultwarden-backup:latest
+  #   restart: on-failure
+  #   network_mode: none
+  #   depends_on:
+  #     - vaultwarden
+  #   volumes:
+  #     - vaultwarden-data:/data:ro
+  #     - /var/backup/vaultwarden:/backup:rw
+  #     - /etc/timezone:/etc/timezone:ro
+  #     - /etc/localtime:/etc/localtime:ro
+  #   environment:
+  #     BACKUP_ADD_DATABASE: false
+  #     BACKUP_DIR: /backup
+  #     TIMESTAMP: true
+  #     DELETE_AFTER: 30
 
 volumes:
   vaultwarden-data:
