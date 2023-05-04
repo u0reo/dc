@@ -1,0 +1,34 @@
+version: '3.9'
+
+networks:
+  internal:
+    name: internal
+    driver: bridge
+    external: true # compose管理外に
+
+services:
+  phpmyadmin:
+    container_name: phpmyadmin
+    hostname: phpmyadmin
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    networks:
+      - internal
+    expose:
+      - 80
+    volumes:
+      - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+    environment:
+      PMA_HOST: localhost
+      PMA_USER: $MYSQL_USERNAME
+      PMA_PASSWORD: $MYSQL_PASSWORD
+    labels:
+      traefik.enable: true
+      traefik.http.routers.pma.rule: Host(`pma.$DOMAIN`)
+      traefik.http.routers.pma.entrypoints: https
+      traefik.http.routers.pma.tls: true
+      traefik.http.routers.pma.middlewares: authelia@docker
