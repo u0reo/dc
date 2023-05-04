@@ -1,0 +1,14 @@
+http:
+  routers:
+    service-name:
+      rule: Host(`service-name.example.com`)
+      entryPoints: https
+      tls: true
+      middlewares:
+        - authelia@docker
+      service: service-name
+  services:
+    service-name:
+      loadBalancer:
+        servers:
+          - url: http://192.168.1.1:1234
