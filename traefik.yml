@@ -1,16 +1,23 @@
 version: '3.9'
 
+networks:
+  internal:
+    name: internal
+    driver: bridge
+    external: true # Composeの管理外に
+
 services:
   traefik:
     container_name: traefik
     hostname: traefik
     image: traefik:v2.10
     restart: unless-stopped
-    network_mode: bridge
     logging:
       driver: journald
       options:
         tag: '{{.Name}}'
+    networks:
+      - internal
     expose:
       - 8080
     ports:
@@ -29,9 +36,10 @@ services:
       traefik.http.routers.traefik.entrypoints: https
       traefik.http.routers.traefik.tls: true
       traefik.http.routers.traefik.middlewares: authelia@docker
-      traefik.http.routers.traefik.service: dashboard@internal
+      traefik.http.routers.traefik.service: api@internal
     command:
       - --api # API/ダッシュボードを有効化
+      - --global.sendAnonymousUsage=false # 使用状況を送信しない
       - --entrypoints.http=true # HTTPで待ち受け
       - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
       - --entrypoints.http.http.redirections.entrypoint.to=https # HTTPはHTPSにリダイレクト
@@ -44,7 +52,7 @@ services:
       - --log.level=INFO # ログのレベルを設定
       - --log.filepath # ログの出力先を標準出力に
       - --providers.docker=true # Dockerサポートを有効化
+      - --providers.docker.network=internal # Dockerサポートを有効化
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
-      - --providers.file=true # ファイルサポートを有効化
       - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
       - --providers.file.watch=true # 動的構成ファイルの変更を監視
