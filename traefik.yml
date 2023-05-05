@@ -1,11 +1,5 @@
 version: '3.9'
 
-networks:
-  internal:
-    name: internal
-    driver: bridge
-    external: true # Composeの管理外に
-
 services:
   traefik:
     container_name: traefik
@@ -16,10 +10,7 @@ services:
       driver: journald
       options:
         tag: '{{.Name}}'
-    networks:
-      - internal
-    expose:
-      - 8080
+    network_mode: host # IPv6対応
     ports:
       - 80:80/tcp # HTTP
       - 443:443/tcp # HTTPS
@@ -30,13 +21,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/traefik:/etc/traefik:ro
       - $CERT_PATH:/certs:ro
-    labels:
-      traefik.enable: true
-      traefik.http.routers.traefik.rule: Host(`traefik.$DOMAIN`)
-      traefik.http.routers.traefik.entrypoints: https
-      traefik.http.routers.traefik.tls: true
-      traefik.http.routers.traefik.middlewares: authelia@docker
-      traefik.http.routers.traefik.service: api@internal
+    # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
+    # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
+    # labels:
+    #   traefik.enable: true
+    #   traefik.http.routers.traefik.rule: Host(`traefik.$DOMAIN`)
+    #   traefik.http.routers.traefik.entrypoints: https
+    #   traefik.http.routers.traefik.tls: true
+    #   traefik.http.routers.traefik.middlewares: authelia@docker
+    #   traefik.http.routers.traefik.service: api@internal
     command:
       - --api # API/ダッシュボードを有効化
       - --global.sendAnonymousUsage=false # 使用状況を送信しない
@@ -52,7 +45,6 @@ services:
       - --log.level=INFO # ログのレベルを設定
       - --log.filepath # ログの出力先を標準出力に
       - --providers.docker=true # Dockerサポートを有効化
-      - --providers.docker.network=internal # Dockerサポートを有効化
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
       - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
       - --providers.file.watch=true # 動的構成ファイルの変更を監視

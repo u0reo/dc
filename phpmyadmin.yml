@@ -1,11 +1,5 @@
 version: '3.9'
 
-networks:
-  internal:
-    name: internal
-    driver: bridge
-    external: true # compose管理外に
-
 services:
   phpmyadmin:
     container_name: phpmyadmin
@@ -16,8 +10,7 @@ services:
       driver: journald
       options:
         tag: '{{.Name}}'
-    networks:
-      - internal
+    network_mode: bridge
     expose:
       - 80
     volumes:

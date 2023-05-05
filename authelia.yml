@@ -1,11 +1,5 @@
 version: '3.9'
 
-networks:
-  internal:
-    name: internal
-    driver: bridge
-    external: true # Composeの管理外に
-
 services:
   authelia:
     container_name: authelia
@@ -16,10 +10,9 @@ services:
       driver: journald
       options:
         tag: '{{.Name}}'
-    networks:
-      - internal
-    expose:
-      - 9091
+    network_mode: bridge
+    ports:
+      - 172.17.0.1:9091:9091 # Docker内でポート開放
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -30,7 +23,7 @@ services:
       traefik.http.routers.auth.rule: Host(`auth.$DOMAIN`)
       traefik.http.routers.auth.entrypoints: https
       traefik.http.routers.auth.tls: true
-      traefik.http.middlewares.authelia.forwardauth.address: http://authelia:9091/api/verify?rd=https%3A%2F%2Fauth.$DOMAIN%2F
+      traefik.http.middlewares.authelia.forwardauth.address: http://172.17.0.1:9091/api/verify?rd=https%3A%2F%2Fauth.$DOMAIN%2F
       traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: true
       traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Name,Remote-Email
     environment:
