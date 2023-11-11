@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+  outline:
+    container_name: outline
+    hostname: outline
+    image: docker.getoutline.com/outlinewiki/outline:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    expose:
+      - 3000
+    volumes:
+      - data:/var/lib/outline/data:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/redis/redis-server.sock:/tmp/redis-server.sock:ro
+    environment:
+      # https://github.com/outline/outline/blob/main/.env.sample
+      NODE_ENV: production
+      SECRET_KEY: $SECRET_KEY
+      UTILS_SECRET: $UTILS_SECRET
+      DATABASE_URL: postgres://outline:$DATABASE_PASSWORD@postgres:5432/outline
+      PGSSLMODE: disable
+      REDIS_URL: /tmp/redis-server.sock
+      URL: https://outline.$DOMAIN
+      FILE_STORAGE: local
+      FILE_STORAGE_UPLOAD_MAX_SIZE: 26214400
+      # https://www.authelia.com/integration/openid-connect/outline/
+      OIDC_CLIENT_ID: outline
+      OIDC_CLIENT_SECRET: $OIDC_CLIENT_SECRET
+      OIDC_AUTH_URI: https://auth.$DOMAIN/api/oidc/authorization
+      OIDC_TOKEN_URI: https://auth.$DOMAIN/api/oidc/token
+      OIDC_USERINFO_URI: https://auth.$DOMAIN/api/oidc/userinfo
+      OIDC_USERNAME_CLAIM: preferred_username
+      OIDC_DISPLAY_NAME: Authelia
+      OIDC_SCOPES: 'openid profile email offline_access'
+      FORCE_HTTPS: false # by traefik
+      ENABLE_UPDATES: true
+      DEFAULT_LANGUAGE: ja_JP
+    labels:
+      traefik.enable: true
+      traefik.http.routers.outline.rule: Host(`outline.$DOMAIN`)
+      traefik.http.routers.outline.entrypoints: https
+      traefik.http.routers.outline.tls: true
+    depends_on:
+      - postgres
+
+  postgres:
+    container_name: outline_postgres
+    hostname: outline_postgres
+    image: postgres
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    expose:
+      - 5432
+    volumes:
+      - postgres:/var/lib/postgresql/data:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      POSTGRES_USER: outline
+      POSTGRES_PASSWORD: $DATABASE_PASSWORD
+      POSTGRES_DB: outline
+
+volumes:
+  data:
+    driver: local
+  postgres:
+    driver: local
