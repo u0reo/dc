@@ -16,11 +16,11 @@ services:
       - 443:443/tcp # HTTPS
       - 443:443/udp # HTTPS3
     volumes:
+      - /etc/traefik:/etc/traefik:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      - /etc/certificates:/etc/certificates:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /etc/traefik:/etc/traefik:ro
-      - $CERT_PATH:/certs:ro
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
     # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
     # labels:

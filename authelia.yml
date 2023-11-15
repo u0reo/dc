@@ -14,10 +14,10 @@ services:
     ports:
       - 172.17.0.1:9091:9091 # Docker内でポート開放
     volumes:
+      - /etc/authelia:/config:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/var/run/mysqld.sock:ro
-      - /etc/authelia:/config:ro
     labels:
       traefik.enable: true
       traefik.http.routers.auth.rule: Host(`auth.$DOMAIN`)

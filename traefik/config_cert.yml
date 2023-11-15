@@ -3,5 +3,5 @@ tls:
     default:
       defaultCertificate:
         # cert.pemには中間証明書がないので、fullchain.pemを指定
-        certFile: /certs/fullchain.pem
-        keyFile: /certs/privkey.pem
+        certFile: /etc/certificates/fullchain.pem
+        keyFile: /etc/certificates/privkey.pem
