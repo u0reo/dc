@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  adguardhome:
+    container_name: adguardhome
+    hostname: adguardhome
+    image: adguard/adguardhome:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    network_mode: bridge
+    expose:
+      - 8080 # Dashboard
+      - 8443 # DNS-over-HTTP(S)/QUIC
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
+      - 853:853/tcp # DNS-over-TLS
+      - 853:853/udp # DNS-over-TLS
+    volumes:
+      - data:/opt/adguardhome/work:rw
+      - /etc/adguardhome:/opt/adguardhome/conf:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/certificates:/etc/certificates:ro
+    labels:
+      traefik.enable: true
+      traefik.http.routers.adguard.rule: Host(`adguard.$DOMAIN`)
+      traefik.http.routers.adguard.entrypoints: https
+      traefik.http.routers.adguard.tls: true
+      traefik.http.routers.adguard.service: adguard
+      traefik.http.services.adguard.loadbalancer.server.port: 8080
+      traefik.http.routers.doh.rule: Host(`dns.$DOMAIN`)
+      traefik.http.routers.doh.entrypoints: https
+      traefik.http.routers.doh.tls: true
+      traefik.http.routers.doh.service: doh
+      traefik.http.services.doh.loadbalancer.server.port: 8443
+      traefik.http.services.doh.loadbalancer.server.scheme: https
+
+volumes:
+  data:
+    driver: local
