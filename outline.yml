@@ -45,6 +45,12 @@ services:
       traefik.http.routers.outline.rule: Host(`outline.$DOMAIN`)
       traefik.http.routers.outline.entrypoints: https
       traefik.http.routers.outline.tls: true
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "localhost", "3000"]
+      start_period: 30s
+      interval: 5s
+      timeout: 10s
+      retries: 3
     depends_on:
       - postgres
 
@@ -67,6 +73,12 @@ services:
       POSTGRES_USER: outline
       POSTGRES_PASSWORD: $DATABASE_PASSWORD
       POSTGRES_DB: outline
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 3
 
 volumes:
   data:
