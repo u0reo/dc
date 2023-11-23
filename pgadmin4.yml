@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  pgadmin4:
+    container_name: pgadmin4
+    hostname: pgadmin4
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    network_mode: bridge
+    expose:
+      - 80
+    volumes:
+      - data:/var/lib/pgadmin:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin4@pgadmin.org
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    labels:
+      traefik.enable: true
+      traefik.http.routers.pgadmin4.rule: Host(`pgadmin4.$DOMAIN`)
+      traefik.http.routers.pgadmin4.entrypoints: https
+      traefik.http.routers.pgadmin4.tls: true
+      traefik.http.routers.pgadmin4.middlewares: authelia@docker
+
+volumes:
+  data:
+    driver: local

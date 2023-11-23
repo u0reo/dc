@@ -1,0 +1,57 @@
+# https://support.getgrist.com/install/example-docker-nginx/#grist
+# https://github.com/gristlabs/grist-core#using-grist
+
+version: '3.9'
+
+services:
+  grist:
+    container_name: grist
+    hostname: grist
+    image: gristlabs/grist:1
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    network_mode: bridge
+    expose:
+      - 8080
+    command: |
+      sh -c '
+        sed -i "130i \"url\": process.env.TYPEORM_URL ?? \"\"," _build/app/server/lib/dbUtils.js &&
+        sh ./sandbox/run.sh
+      '
+    volumes:
+      - data:/persist:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+    # https://support.getgrist.com/install/example-docker-nginx/#environment
+    # https://github.com/gristlabs/grist-core#environment-variables
+    environment:
+      PORT: 8080
+      APP_HOME_URL: https://grist.$DOMAIN
+      GRIST_ALLOWED_HOSTS: $GRIST_ALLOWED_HOSTS
+      GRIST_DOMAIN: grist.$DOMAIN
+      GRIST_SINGLE_ORG: $GRIST_SINGLE_ORG
+      GRIST_HIDE_UI_ELEMENTS: helpCenter,billing,templates,multiSite
+      GRIST_LIST_PUBLIC_SITES: true
+      GRIST_MAX_UPLOAD_ATTACHMENT_MB: 10
+      GRIST_MAX_UPLOAD_IMPORT_MB: 300
+      GRIST_OFFER_ALL_LANGUAGES: true
+      GRIST_ORG_IN_PATH: false
+      GRIST_PAGE_TITLE_SUFFIX: _blank
+      # GRIST_THROTTLE_CPU: true
+      # GRIST_SANDBOX_FLAVOR: pynbox # gvisor
+      TYPEORM_TYPE: postgres
+      TYPEORM_URL: $DATABASE_URL
+    labels:
+      traefik.enable: true
+      traefik.http.routers.grist.rule: Host(`grist.$DOMAIN`)
+      traefik.http.routers.grist.entrypoints: https
+      traefik.http.routers.grist.tls: true
+      traefik.http.routers.grist.middlewares: authelia@docker
+
+volumes:
+  data:
+    driver: local

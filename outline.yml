@@ -16,13 +16,14 @@ services:
       - data:/var/lib/outline/data:rw
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
       - /var/run/redis/redis-server.sock:/tmp/redis-server.sock:ro
     environment:
       # https://github.com/outline/outline/blob/main/.env.sample
       NODE_ENV: production
       SECRET_KEY: $SECRET_KEY
       UTILS_SECRET: $UTILS_SECRET
-      DATABASE_URL: postgres://outline:$DATABASE_PASSWORD@postgres:5432/outline
+      DATABASE_URL: postgres://outline@host/outline?host=/tmp
       PGSSLMODE: disable
       REDIS_URL: /tmp/redis-server.sock
       URL: https://outline.$DOMAIN
@@ -51,37 +52,7 @@ services:
       interval: 5s
       timeout: 10s
       retries: 3
-    depends_on:
-      - postgres
-
-  postgres:
-    container_name: outline_postgres
-    hostname: outline_postgres
-    image: postgres
-    restart: unless-stopped
-    logging:
-      driver: journald
-      options:
-        tag: '{{.Name}}'
-    expose:
-      - 5432
-    volumes:
-      - postgres:/var/lib/postgresql/data:rw
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
-    environment:
-      POSTGRES_USER: outline
-      POSTGRES_PASSWORD: $DATABASE_PASSWORD
-      POSTGRES_DB: outline
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      start_period: 10s
-      interval: 5s
-      timeout: 10s
-      retries: 3
 
 volumes:
   data:
-    driver: local
-  postgres:
     driver: local
