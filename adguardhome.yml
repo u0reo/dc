@@ -10,15 +10,15 @@ services:
       driver: journald
       options:
         tag: '{{.Name}}'
-    network_mode: bridge
-    expose:
-      - 8080 # Dashboard
-      - 8443 # DNS-over-HTTP(S)/QUIC
-    ports:
-      - 53:53/tcp
-      - 53:53/udp
-      - 853:853/tcp # DNS-over-TLS
-      - 853:853/udp # DNS-over-TLS
+    network_mode: host
+    # expose:
+    #   - 8080 # Dashboard
+    #   - 8443 # DNS-over-HTTP(S)/QUIC
+    # ports:
+    #   - 53:53/tcp
+    #   - 53:53/udp
+    #   - 853:853/tcp # DNS-over-TLS
+    #   - 853:853/udp # DNS-over-TLS
     volumes:
       - data:/opt/adguardhome/work:rw
       - /etc/adguardhome:/opt/adguardhome/conf:rw
