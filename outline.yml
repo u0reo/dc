@@ -28,7 +28,7 @@ services:
       REDIS_URL: /tmp/redis-server.sock
       URL: https://outline.$DOMAIN
       FILE_STORAGE: local
-      FILE_STORAGE_UPLOAD_MAX_SIZE: 26214400
+      FILE_STORAGE_UPLOAD_MAX_SIZE: 1000000000 # 1GB
       # https://www.authelia.com/integration/openid-connect/outline/
       OIDC_CLIENT_ID: outline
       OIDC_CLIENT_SECRET: $OIDC_CLIENT_SECRET
