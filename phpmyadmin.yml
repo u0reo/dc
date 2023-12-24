@@ -13,6 +13,12 @@ services:
     network_mode: bridge
     expose:
       - 80
+    command: |
+      sh -c '
+        sed -i "/access/s/^/# /g" /etc/apache2/sites-available/000-default.conf &&
+        unlink /etc/apache2/conf-enabled/other-vhosts-access-log.conf &&
+        apache2-foreground
+      '
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
