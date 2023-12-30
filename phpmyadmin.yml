@@ -17,6 +17,7 @@ services:
       sh -c '
         sed -i "/access/s/^/# /g" /etc/apache2/sites-available/000-default.conf &&
         unlink /etc/apache2/conf-enabled/other-vhosts-access-log.conf &&
+        touch /etc/phpmyadmin/config.secret.inc.php &&
         apache2-foreground
       '
     volumes:
