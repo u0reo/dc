@@ -19,7 +19,7 @@ services:
       - /etc/traefik:/etc/traefik:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /etc/certificates:/etc/certificates:ro
+      - /etc/certificates:/etc/certificates:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
     # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
@@ -39,6 +39,10 @@ services:
       - --entrypoints.http.http.redirections.entrypoint.scheme=https # HTTPはHTPSにリダイレクト
       - --entrypoints.https=true # HTTPSで待ち受け
       - --entrypoints.https.address=:443 # HTTPSは443ポートで待ち受け
+      - --entrypoints.https.http.tls=true # HTTPSはTLSを有効化
+      - --entrypoints.https.http.tls.certResolver=letsencrypt # HTTPSは「letsencrypt」の証明書を使用
+      - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
+      - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAIN
       - --entrypoints.https.http3=true # HTTP3対応
       - --experimental.http3=true # 試験的なHTTP3対応の有効化
       - --log=true # ログの出力を有効化
@@ -48,3 +52,10 @@ services:
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
       - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
       - --providers.file.watch=true # 動的構成ファイルの変更を監視
+      - --certificatesResolvers.letsencrypt.acme.email=$ACME_EMAIL # ACMEに使用するメールアドレス
+      - --certificatesResolvers.letsencrypt.acme.storage=/etc/certificates/acme.json # acme.jsonの保存先
+      - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
+      - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
+      - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
+    environment:
+      CLOUDFLARE_DNS_API_TOKEN: $CLOUDFLARE_API_TOKEN

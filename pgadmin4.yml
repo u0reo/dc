@@ -26,7 +26,6 @@ services:
       traefik.enable: true
       traefik.http.routers.pgadmin4.rule: Host(`pgadmin4.$DOMAIN`)
       traefik.http.routers.pgadmin4.entrypoints: https
-      traefik.http.routers.pgadmin4.tls: true
       traefik.http.routers.pgadmin4.middlewares: authelia@docker
 
 volumes:

@@ -32,7 +32,6 @@ services:
       traefik.enable: true
       traefik.http.routers.pma.rule: Host(`pma.$DOMAIN`)
       traefik.http.routers.pma.entrypoints: https
-      traefik.http.routers.pma.tls: true
       traefik.http.routers.pma.middlewares: authelia@docker
     healthcheck:
       test: ["CMD", "curl", "-Ss", "http://localhost/robots.txt"]

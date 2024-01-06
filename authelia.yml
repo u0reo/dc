@@ -22,7 +22,6 @@ services:
       traefik.enable: true
       traefik.http.routers.auth.rule: Host(`auth.$DOMAIN`)
       traefik.http.routers.auth.entrypoints: https
-      traefik.http.routers.auth.tls: true
       # http://authelia:9091/api/authz/forward-auth?authelia_url=https%3A%2F%2Fauth.$DOMAIN%2F
       traefik.http.middlewares.authelia.forwardauth.address: http://172.17.0.1:9091/api/verify?rd=https%3A%2F%2Fauth.$DOMAIN%2F
       traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: true

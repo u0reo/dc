@@ -49,7 +49,6 @@ services:
       traefik.enable: true
       traefik.http.routers.grist.rule: Host(`grist.$DOMAIN`)
       traefik.http.routers.grist.entrypoints: https
-      traefik.http.routers.grist.tls: true
       traefik.http.routers.grist.middlewares: authelia@docker
 
 volumes:

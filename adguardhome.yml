@@ -29,12 +29,10 @@ services:
       traefik.enable: true
       traefik.http.routers.adguard.rule: Host(`adguard.$DOMAIN`)
       traefik.http.routers.adguard.entrypoints: https
-      traefik.http.routers.adguard.tls: true
       traefik.http.routers.adguard.service: adguard
       traefik.http.services.adguard.loadbalancer.server.port: 8080
       traefik.http.routers.doh.rule: Host(`dns.$DOMAIN`)
       traefik.http.routers.doh.entrypoints: https
-      traefik.http.routers.doh.tls: true
       traefik.http.routers.doh.service: doh
       traefik.http.services.doh.loadbalancer.server.port: 8443
       traefik.http.services.doh.loadbalancer.server.scheme: https

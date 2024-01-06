@@ -45,7 +45,6 @@ services:
       traefik.enable: true
       traefik.http.routers.outline.rule: Host(`outline.$DOMAIN`)
       traefik.http.routers.outline.entrypoints: https
-      traefik.http.routers.outline.tls: true
     healthcheck:
       test: ["CMD", "nc", "-vz", "localhost", "3000"]
       start_period: 30s
