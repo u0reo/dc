@@ -1,0 +1,52 @@
+# https://hub.docker.com/r/sailfrog/cypht-docker
+# Custom Build from https://github.com/u0reo/cypht-docker
+
+version: '3.9'
+
+services:
+  cypht:
+    container_name: cypht
+    hostname: cypht
+    image: cypht:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    network_mode: bridge
+    expose:
+      - 80
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/mysqld/mysqld.sock:/var/lib/mysqld/mysqld.sock:ro
+      # - /var/run/redis/redis-server.sock:/tmp/redis-server.sock:ro
+    environment:
+      CYPHT_SESSION_TYPE: DB
+      CYPHT_AUTH_USERNAME: $AUTH_USERNAME
+      CYPHT_AUTH_PASSWORD: $AUTH_PASSWORD
+      CYPHT_AUTH_TYPE: DB
+      CYPHT_ADMIN_USERS: $ADMIN_USERS
+      CYPHT_DEFAULT_LANGUAGE: ja
+      CYPHT_ALLOW_LONG_SESSION: true
+      CYPHT_ENCRYPT_AJAX_REQUESTS: true
+      CYPHT_ENCRYPT_LOCAL_STORAGE: true
+      CYPHT_ALLOW_EXTERNAL_IMAGE_SOURCES: true
+      CYPHT_MODULE_FEEDS: disable
+      CYPHT_MODULE_POP3: disable
+      CYPHT_MODULE_ACCOUNT: disable
+      CYPHT_MODULE_DYNAMIC_LOGIN: enable
+      CYPHT_MODULE_DESKTOP_NOTIFICATIONS: enable
+      CYPHT_USER_CONFIG_TYPE: DB
+      CYPHT_DB_CONNECTION_TYPE: socket
+      CYPHT_DB_SOCKET: /var/lib/mysqld/mysqld.sock
+      CYPHT_DB_NAME: cypht
+      CYPHT_DB_USER: cypht
+      CYPHT_DB_PASS: $DB_PASSWORD
+      CYPHT_DB_DRIVER: mysql
+    labels:
+      traefik.enable: true
+      traefik.http.routers.cypht.rule: Host(`cypht.$DOMAIN`)
+      traefik.http.routers.cypht.entrypoints: https
+      traefik.http.routers.cypht.tls: true
+      traefik.http.routers.cypht.middlewares: authelia@docker
