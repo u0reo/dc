@@ -10,6 +10,7 @@ services:
       driver: journald
       options:
         tag: '{{.Name}}'
+    network_mode: bridge
     expose:
       - 3000
     volumes:
@@ -37,7 +38,7 @@ services:
       OIDC_USERINFO_URI: https://auth.$DOMAIN/api/oidc/userinfo
       OIDC_USERNAME_CLAIM: preferred_username
       OIDC_DISPLAY_NAME: Authelia
-      OIDC_SCOPES: 'openid profile email'
+      OIDC_SCOPES: 'openid profile email offline_access'
       FORCE_HTTPS: false # by traefik
       ENABLE_UPDATES: true
       DEFAULT_LANGUAGE: ja_JP
@@ -46,9 +47,9 @@ services:
       traefik.http.routers.outline.rule: Host(`outline.$DOMAIN`)
       traefik.http.routers.outline.entrypoints: https
     healthcheck:
-      test: ["CMD", "nc", "-vz", "localhost", "3000"]
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/_health"]
       start_period: 30s
-      interval: 5s
+      interval: 20s
       timeout: 10s
       retries: 3
 
