@@ -1,0 +1,26 @@
+version: '3.9'
+
+services:
+  dashy:
+    container_name: dashy
+    hostname: dashy
+    image: lissy93/dashy:latest
+    restart: unless-stopped
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    network_mode: bridge
+    expose:
+      - 80
+    volumes:
+      - /etc/dashy/conf.yml:/app/public/conf.yml:rw
+    environment:
+      NODE_ENV: production
+      # PORT: 80
+    labels:
+      traefik.enable: true
+      traefik.http.routers.dashy.rule: Host(`dashy.$DOMAIN`)
+      traefik.http.routers.dashy.entrypoints: https
+      traefik.http.routers.dashy.tls: true
+      traefik.http.routers.dashy.middlewares: authelia@docker
