@@ -47,7 +47,8 @@ services:
       traefik.http.routers.outline.rule: Host(`outline.$DOMAIN`)
       traefik.http.routers.outline.entrypoints: https
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:3000/_health"]
+      # https://stackoverflow.com/questions/6136022/script-to-get-the-http-status-code-of-a-list-of-urls
+      test: ["CMD", "curl", "-o", "/dev/null", "--silent", "--write-out", "'%{http_code}\n'", "--fail", "http://localhost:3000/_health"]
       start_period: 30s
       interval: 20s
       timeout: 10s
