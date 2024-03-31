@@ -16,6 +16,7 @@ services:
     network_mode: bridge
     expose:
       - 8080
+    # https://github.com/typeorm/typeorm/issues/2614#issuecomment-1072313861
     command: |
       sh -c '
         sed -i "130i \"url\": process.env.TYPEORM_URL ?? \"\"," _build/app/server/lib/dbUtils.js &&
@@ -49,6 +50,7 @@ services:
       traefik.enable: true
       traefik.http.routers.grist.rule: Host(`grist.$DOMAIN`)
       traefik.http.routers.grist.entrypoints: https
+      traefik.http.routers.grist.tls: true
       traefik.http.routers.grist.middlewares: authelia@docker
 
 volumes:
