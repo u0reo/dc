@@ -4,7 +4,7 @@ services:
   traefik:
     container_name: traefik
     hostname: traefik
-    image: traefik:v2.10
+    image: traefik:v3.4
     restart: unless-stopped
     logging:
       driver: journald
@@ -16,10 +16,10 @@ services:
       - 443:443/tcp # HTTPS
       - 443:443/udp # HTTPS3
     volumes:
-      - /etc/traefik:/etc/traefik:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /etc/certificates:/etc/certificates:rw
+      - $CONFIG_PATH/traefik:/etc/traefik:ro
+      - $CONFIG_PATH/certificates:/etc/certificates:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
     # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
@@ -27,7 +27,6 @@ services:
     #   traefik.enable: true
     #   traefik.http.routers.traefik.rule: Host(`traefik.$DOMAIN`)
     #   traefik.http.routers.traefik.entrypoints: https
-    #   traefik.http.routers.traefik.tls: true
     #   traefik.http.routers.traefik.middlewares: authelia@docker
     #   traefik.http.routers.traefik.service: api@internal
     command:
@@ -44,7 +43,6 @@ services:
       - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
       - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAIN
       - --entrypoints.https.http3=true # HTTP3対応
-      - --experimental.http3=true # 試験的なHTTP3対応の有効化
       - --log=true # ログの出力を有効化
       - --log.level=INFO # ログのレベルを設定
       - --log.filepath # ログの出力先を標準出力に
@@ -60,4 +58,6 @@ services:
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
     environment:
+      # ゾーン>>DNS(読み書き) と ゾーン>>ゾーン(読み取り) の権限が必要
+      # https://dash.cloudflare.com/profile/api-tokens
       CLOUDFLARE_DNS_API_TOKEN: $CLOUDFLARE_API_TOKEN
