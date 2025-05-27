@@ -3,7 +3,6 @@ http:
     service-name:
       rule: Host(`service-name.example.com`)
       entryPoints: https
-      tls: true
       middlewares:
         - authelia@docker
       service: service-name
