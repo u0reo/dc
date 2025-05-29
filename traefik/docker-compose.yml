@@ -50,7 +50,6 @@ services:
       - --providers.file.watch=true # 動的構成ファイルの変更を監視
       # https://major.io/p/wildcard-letsencrypt-certificates-traefik-cloudflare/
       # https://go-acme.github.io/lego/dns/cloudflare/
-      - --certificatesResolvers.letsencrypt.acme.email=$ACME_EMAIL # ACMEに使用するメールアドレス
       - --certificatesResolvers.letsencrypt.acme.storage=/etc/certificates/acme.json # acme.jsonの保存先
       - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
