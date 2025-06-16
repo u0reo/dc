@@ -1,0 +1,6 @@
+# https://www.authelia.com/configuration/second-factor/webauthn/
+webauthn:
+  enable_passkey_login: true
+  experimental_enable_passkey_uv_two_factors: true
+  selection_criteria:
+    attachment: platform

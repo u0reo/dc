@@ -1,0 +1,10 @@
+# https://www.authelia.com/configuration/notifications/smtp/
+# https://app.mailjet.com/account/apikeys
+notifier:
+  smtp:
+    address: smtp://smtp.example.com:587
+    username: username
+    password: password
+    sender: 'Authelia <no-reply@auth.example.com>'
+    subject: '[auth.example.com] {title}'
+    startup_check_address: test@example.com

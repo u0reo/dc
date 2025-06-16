@@ -1,0 +1,10 @@
+# https://www.authelia.com/configuration/session/introduction/
+session:
+  secret: run `docker run --rm authelia/authelia:4 authelia crypto rand --length 64 --charset alphanumeric`
+  same_site: strict  # 必ずクッキーを送信しない
+  inactivity: 5m  # 最後の動きからログアウトまでの時間: 5分
+  expiration: 1h  # クッキー自体の保持期間: 1時間
+  remember_me: 1M  # ログインを維持する時間: 1ヶ月
+  cookies:
+    - domain: example.com
+      authelia_url: https://auth.example.com

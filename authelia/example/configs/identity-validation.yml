@@ -1,0 +1,4 @@
+# https://www.authelia.com/configuration/identity-validation/reset-password/
+identity_validation:
+  reset_password:
+    jwt_secret: run `docker run --rm authelia/authelia:4 authelia crypto rand --length 64 --charset alphanumeric`

@@ -1,0 +1,13 @@
+# Prometheus
+# https://www.authelia.com/configuration/telemetry/metrics/
+# telemetry:
+#   metrics:
+#     enabled: false
+#     address: 'tcp://:9959/metrics'
+#     buffers:
+#       read: 4096
+#       write: 4096
+#     timeouts:
+#       read: '6s'
+#       write: '6s'
+#       idle: '30s'

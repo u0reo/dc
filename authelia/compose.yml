@@ -1,0 +1,37 @@
+services:
+  authelia:
+    container_name: authelia
+    hostname: authelia
+    image: authelia/authelia:4
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - 172.17.0.1:9091:9091/tcp # Dockerのブリッジインターフェースのゲートウェイに対しポート開放
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/mysqld/mysqld.sock:/tmp/mysqld.sock:ro
+      - /var/run/redis/redis-server.sock:/tmp/redis-server.sock:ro
+      - /etc/dc/authelia:/opt:ro
+    labels:
+      traefik.enable: true
+      traefik.http.routers.auth.rule: Host(`auth.$DOMAIN`)
+      traefik.http.routers.auth.entrypoints: https
+      traefik.http.routers.auth.tls: true
+      # http://authelia:9091/api/authz/forward-auth?authelia_url=https%3A%2F%2Fauth.$DOMAIN%2F
+      traefik.http.middlewares.authelia.forwardauth.address: http://172.17.0.1:9091/api/verify?rd=https%3A%2F%2Fauth.$DOMAIN%2F
+      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: true
+      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Name,Remote-Email
+    command: authelia  # optディレクトリを使用するため
+    environment:
+      X_AUTHELIA_CONFIG: /opt/configs/  # 構成ファイルの存在するディレクトリのパス
+      X_AUTHELIA_CONFIG_FILTERS: template  # identity-providersなどで使われるテンプレートエンジンで使用
+      AUTHELIA_AUTHENTICATION_BACKEND_FILE_PATH: /opt/data/users.yml  # ユーザーデータが存在するパス
+      AUTHELIA_SESSION_REDIS_HOST: /tmp/redis-server.sock
+      AUTHELIA_SESSION_REDIS_DATABASE_INDEX: $REDIS_DB_INDEX
+      AUTHELIA_STORAGE_MYSQL_ADDRESS: unix:///tmp/mysqld.sock
+      AUTHELIA_STORAGE_MYSQL_DATABASE: authelia
+      AUTHELIA_STORAGE_MYSQL_USERNAME: authelia
+      AUTHELIA_DEFAULT_2FA_METHOD: webauthn  # デフォルトの2FAメソッドはWebAuthn
+      AUTHELIA_THEME: auto  # 背景色をシステム設定に合わせる
+      AUTHELIA_NTP_ADDRESS: udp://$NTP_ADDRESS
