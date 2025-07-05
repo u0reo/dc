@@ -4,10 +4,6 @@ services:
     hostname: traefik
     image: traefik:v3.4
     restart: unless-stopped
-    logging:
-      driver: journald
-      options:
-        tag: '{{.Name}}'
     network_mode: host # IPv6対応
     ports:
       - 80:80/tcp # HTTP
@@ -28,7 +24,8 @@ services:
     #   traefik.http.routers.traefik.middlewares: authelia@docker
     #   traefik.http.routers.traefik.service: api@internal
     command:
-      - --api # API/ダッシュボードを有効化
+      - --ping=true # HealthCheck用にping機能を有効化
+      - --api.insecure=true # API/ダッシュボードを有効化
       - --global.sendAnonymousUsage=false # 使用状況を送信しない
       - --entrypoints.http=true # HTTPで待ち受け
       - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
@@ -43,7 +40,6 @@ services:
       - --entrypoints.https.http3=true # HTTP3対応
       - --log=true # ログの出力を有効化
       - --log.level=INFO # ログのレベルを設定
-      - --log.filepath # ログの出力先を標準出力に
       - --providers.docker=true # Dockerサポートを有効化
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
       - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
@@ -58,3 +54,9 @@ services:
       # ゾーン>>DNS(読み書き) と ゾーン>>ゾーン(読み取り) の権限が必要
       # https://dash.cloudflare.com/profile/api-tokens
       CLOUDFLARE_DNS_API_TOKEN: $CLOUDFLARE_API_TOKEN
+    healthcheck:
+      test: ['CMD-SHELL', 'traefik healthcheck --ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
