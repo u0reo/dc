@@ -1,18 +1,16 @@
 identity_providers:
   oidc:
-    # https://www.authelia.com/configuration/identity-providers/open-id-connect/
+    # https://www.authelia.com/configuration/identity-providers/openid-connect/provider/
     hmac_secret: run `docker run --rm authelia/authelia:4 authelia crypto rand --length 64 --charset alphanumeric`
     jwks:
-      # docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd)":/keys authelia/authelia:4 authelia crypto pair ecdsa generate --directory /keys
-      - key_id: ES256
-        algorithm: ES256
+      # docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/secrets":/secrets authelia/authelia:4 authelia crypto pair ecdsa generate --directory /secrets --file.private-key ecdsa-private.pem --file.public-key ecdsa-public.pem
+      - key_id: ECDSA
         key: |
           {{- fileContent "/opt/secrets/ecdsa-private.pem" | nindent 10 }}
-      # docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd)":/keys authelia/authelia:4 authelia crypto pair ecdsa generate --directory /keys
-      - key_id: RS256
-        algorithm: RS256
+      # docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/secrets":/secrets authelia/authelia:4 authelia crypto pair rsa generate --directory /secrets --file.private-key rsa-private.pem --file.public-key rsa-public.pem
+      - key_id: RSA
         key: |
-          {{- fileContent "/opt/secrets/rsa256-private.pem" | nindent 10 }}
+          {{- fileContent "/opt/secrets/rsa-private.pem" | nindent 10 }}
 
     lifespans:
       access_token: 1h
@@ -33,7 +31,7 @@ identity_providers:
     clients:
       - client_id: unique-id
         client_name: displayed in the authorization or recognized by the service
-        client_secret: run `docker run --rm authelia/authelia authelia crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset rfc3986`
+        client_secret: run `docker run --rm authelia/authelia:4 authelia crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset rfc3986`
         public: false # Not required
         authorization_policy: two_factor # Not required
         redirect_uris:

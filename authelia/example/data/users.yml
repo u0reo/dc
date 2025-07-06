@@ -2,7 +2,7 @@ users:
   taro:
     disabled: false
     displayname: taro
-    password: run `docker run authelia/authelia:latest authelia crypto hash generate argon2 --password XXXXXXXX`
+    password: run `docker run --rm authelia/authelia:4 authelia crypto hash generate argon2 --password XXXXXXXX`
     email: taro@example.com
     groups:
       - admins

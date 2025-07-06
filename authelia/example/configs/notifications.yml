@@ -1,5 +1,6 @@
 # https://www.authelia.com/configuration/notifications/smtp/
 # https://app.mailjet.com/account/apikeys
+# https://app.mailjet.com/account/relay
 notifier:
   smtp:
     address: smtp://smtp.example.com:587
