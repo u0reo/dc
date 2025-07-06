@@ -4,19 +4,15 @@ services:
     hostname: vaultwarden
     image: vaultwarden/server:alpine
     restart: unless-stopped
-    logging:
-      driver: journald
-      options:
-        tag: '{{.Name}}'
     network_mode: bridge
     expose:
       - 80
       - 3012
     volumes:
-      - data:/data:rw
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+      - $DATA_PATH:/data:rw
     environment:
       WEBSOCKET_ENABLED: true
       DATABASE_URL: $DATABASE_URL
@@ -41,11 +37,11 @@ services:
       traefik.http.routers.vw-ws.service: vw-ws
       traefik.http.services.vw-ws.loadbalancer.server.port: 3012
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      start_period: 30s
-      interval: 5s
+      test: ['CMD-SHELL', '/healthcheck.sh']
+      interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   # vaultwarden-backup:
   #   # https://registry.hub.docker.com/r/bruceforce/vaultwarden-backup
@@ -65,7 +61,3 @@ services:
   #     BACKUP_DIR: /backup
   #     TIMESTAMP: true
   #     DELETE_AFTER: 30
-
-volumes:
-  data:
-    driver: local
