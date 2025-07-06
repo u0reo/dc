@@ -10,11 +10,11 @@ services:
       - 443:443/tcp # HTTPS
       - 443:443/udp # HTTPS3
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - $CONFIG_PATH/traefik:/etc/traefik:ro
-      - $CONFIG_PATH/certificates:/etc/certificates:rw
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/dc/traefik/configs:/configs:ro
+      - /opt/dc/traefik/certificates:/certificates:rw
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
     # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
     # labels:
@@ -42,11 +42,11 @@ services:
       - --log.level=INFO # ログのレベルを設定
       - --providers.docker=true # Dockerサポートを有効化
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
-      - --providers.file.directory=/etc/traefik # 動的構成ファイル追加先を指定
+      - --providers.file.directory=/configs # 動的構成ファイル追加先を指定
       - --providers.file.watch=true # 動的構成ファイルの変更を監視
       # https://major.io/p/wildcard-letsencrypt-certificates-traefik-cloudflare/
       # https://go-acme.github.io/lego/dns/cloudflare/
-      - --certificatesResolvers.letsencrypt.acme.storage=/etc/certificates/acme.json # acme.jsonの保存先
+      - --certificatesResolvers.letsencrypt.acme.storage=/certificates/acme.json # acme.jsonの保存先
       - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
