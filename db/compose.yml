@@ -40,7 +40,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - $DB_DATA_PATH/postgresql:/var/lib/postgresql/data:rw
+      - $DB_DATA_PATH/postgresql:/var/lib/postgresql:rw
       - $DB_SOCKET_PATH/postgresql:/var/run/postgresql:rw
     environment:
       LANG: ja_JP.utf8
