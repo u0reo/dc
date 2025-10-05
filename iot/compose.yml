@@ -1,0 +1,69 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    hostname: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host # ブロードキャスト対応
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
+      - /opt/dc/iot/hass/configs:/config:rw
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    labels:
+      traefik.enable: true
+      traefik.http.routers.hass.rule: Host(`hass.$DOMAIN`)
+      traefik.http.routers.hass.entrypoints: https
+      traefik.http.routers.hass.tls: true
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsSL http://localhost:8123']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  mosquitto:
+    container_name: mosquitto
+    hostname: mosquitto
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - 1883:1883/tcp # MQTT
+      # - 9001:9001/tcp # MQTT via WebSocket
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/iot/mosquitto:/mosquitto:rw
+      - /opt/dc/iot/mosquitto/config:/mosquitto/config:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mosquitto_pub -h localhost -p 1883 -t "healthcheck/ping" -m "ping"']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  node-red:
+    container_name: nodered
+    hostname: nodered
+    image: nodered/node-red:latest-22-minimal
+    restart: unless-stopped
+    network_mode: bridge
+    expose:
+      - 1880
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/iot/nodered:/data:rw
+    depends_on:
+      - mosquitto
+    labels:
+      traefik.enable: true
+      traefik.http.routers.nodered.rule: Host(`nodered.$DOMAIN`)
+      traefik.http.routers.nodered.entrypoints: https
+      traefik.http.routers.nodered.tls: true
+      traefik.http.routers.nodered.middlewares: authelia@docker

@@ -1,0 +1,26 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# https://community.home-assistant.io/t/solved-howto-home-assistant-vm-behind-traefik-unable-to-connect-to-home-assistant/322776/2
+http:
+  ip_ban_enabled: true
+  login_attempts_threshold: 5
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - 192.168.1.x
+    - ::1
+    - fe80::x
+
+# https://www.home-assistant.io/integrations/recorder/
+recorder:
+  db_url: mysql://homeassistant:insecure_secret@localhost/homeassistant?unix_socket=/tmp/mysql.sock&charset=utf8mb4

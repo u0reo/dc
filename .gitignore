@@ -1,7 +1,10 @@
-/setup.sh
-
 /*/**
 !/*/**/
 !/*/**/.gitkeep
 !/*/example/**/*
+!/*/**/*.example.*
 !/*/*
+
+/**/.env*
+
+/portainer
