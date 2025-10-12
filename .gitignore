@@ -2,7 +2,7 @@
 !/*/**/
 !/*/**/.gitkeep
 !/*/example/**/*
-!/*/**/*.example.*
+!/*/**/*.example*
 !/*/*
 
 /**/.env*

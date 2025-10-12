@@ -25,6 +25,34 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    depends_on:
+      - esphome
+
+  esphome:
+    container_name: esphome
+    hostname: esphome
+    image: ghcr.io/esphome/esphome:latest
+    restart: unless-stopped
+    user: 1000:1000
+    network_mode: bridge
+    expose:
+      - 6052
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/iot/esphome:/config:rw
+      - /opt/dc/iot/esphome/.cache:/.cache:rw
+      - /opt/dc/iot/esphome/.platformio:/.platformio:rw
+      - /opt/dc/iot/esphome/hosts:/etc/hosts:ro
+    environment:
+      ESPHOME_DASHBOARD_USE_PING: true
+      USERNAME: $ESPHOME_USERNAME
+      PASSWORD: $ESPHOME_PASSWORD
+    labels:
+      traefik.enable: true
+      traefik.http.routers.esphome.rule: Host(`esphome.$DOMAIN`)
+      traefik.http.routers.esphome.entrypoints: https
+      traefik.http.routers.esphome.tls: true
 
   mosquitto:
     container_name: mosquitto
