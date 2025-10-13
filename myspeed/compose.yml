@@ -1,0 +1,25 @@
+services:
+  myspeed:
+    container_name: myspeed
+    hostname: myspeed
+    image: germannewsmaker/myspeed:latest
+    restart: unless-stopped
+    network_mode: host  # To make it as fast as possible
+    expose:
+      - 5216
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/myspeed/data:/myspeed/data
+    labels:
+      traefik.enable: true
+      traefik.http.routers.myspeed.rule: Host(`myspeed.$DOMAIN`)
+      traefik.http.routers.myspeed.entrypoints: https
+      traefik.http.routers.myspeed.tls: true
+      traefik.http.routers.myspeed.middlewares: authelia@docker
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider --server-response -q http://localhost:5216 2>&1 | awk "/^  HTTP/{print $2}"']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
