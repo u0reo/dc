@@ -10,7 +10,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
-      - /opt/dc/iot/hass/configs:/config:rw
+      - /opt/dc/iot/hass:/config:rw
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
