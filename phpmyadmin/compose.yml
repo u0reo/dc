@@ -17,6 +17,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
+      - /opt/dc/phpmyadmin/config.php:/etc/phpmyadmin/config.user.inc.php:ro
     environment:
       PMA_HOST: localhost
       PMA_USER: $MYSQL_USERNAME
