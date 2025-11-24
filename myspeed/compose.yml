@@ -15,8 +15,9 @@ services:
       traefik.enable: true
       traefik.http.routers.myspeed.rule: Host(`myspeed.$DOMAIN`)
       traefik.http.routers.myspeed.entrypoints: https
-      traefik.http.routers.myspeed.tls: true
       traefik.http.routers.myspeed.middlewares: authelia@docker
+      traefik.http.routers.myspeed.service: myspeed
+      traefik.http.services.myspeed.loadbalancer.server.port: 5216
     healthcheck:
       test: ['CMD-SHELL', 'wget --spider --server-response -q http://localhost:5216 2>&1 | awk "/^  HTTP/{print $2}"']
       interval: 30s

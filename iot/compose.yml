@@ -5,6 +5,8 @@ services:
     image: ghcr.io/home-assistant/home-assistant:stable
     restart: unless-stopped
     network_mode: host # ブロードキャスト対応
+    expose:
+      - 8123
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -18,7 +20,8 @@ services:
       traefik.enable: true
       traefik.http.routers.hass.rule: Host(`hass.$DOMAIN`)
       traefik.http.routers.hass.entrypoints: https
-      traefik.http.routers.hass.tls: true
+      traefik.http.routers.hass.service: hass
+      traefik.http.services.hass.loadbalancer.server.port: 8123
     healthcheck:
       test: ['CMD-SHELL', 'curl -fsSL http://localhost:8123']
       interval: 30s
@@ -52,7 +55,6 @@ services:
       traefik.enable: true
       traefik.http.routers.esphome.rule: Host(`esphome.$DOMAIN`)
       traefik.http.routers.esphome.entrypoints: https
-      traefik.http.routers.esphome.tls: true
 
   mosquitto:
     container_name: mosquitto
@@ -93,5 +95,4 @@ services:
       traefik.enable: true
       traefik.http.routers.nodered.rule: Host(`nodered.$DOMAIN`)
       traefik.http.routers.nodered.entrypoints: https
-      traefik.http.routers.nodered.tls: true
       traefik.http.routers.nodered.middlewares: authelia@docker
