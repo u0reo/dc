@@ -1,0 +1,10 @@
+# 隠しフォルダや一時ファイル
+.*
+!.gitignore
+
+# VSCodeのワークスペース設定ファイル
+*.code-workspace
+
+# Docker-Compose設定ファイル
+docker-compose.yml
+compose.yml

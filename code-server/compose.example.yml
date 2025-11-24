@@ -1,0 +1,46 @@
+# https://coder.com/docs/code-server/install#docker
+services:
+  code-server:
+    container_name: code-server
+    hostname: code-server
+    image: codercom/code-server:latest
+    restart: unless-stopped
+    working_dir: /home/coder
+    user: 1000:100 # $(id -u):$(id -g)
+    # https://forums.docker.com/t/user-access-to-multiple-groups-within-containers/119689/6
+    group_add:
+      - '101' # Administrators
+      - '65536' # Docker
+    network_mode: bridge
+    ports:
+      - 7000:7000/tcp
+      - 2222:22/tcp # コンテナ内へ SSH 接続するためのポート
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/dc/code-server:/home/coder:rw
+      - /volume1/homes/$DOCKER_USER:/home/$DOCKER_USER:rw
+      - /volume1/homes:/var/services/homes:rw
+      - /volume1:/volume1:rw
+      - /volume2:/volume2:rw
+      - /volumeUSB1:/volumeUSB1:rw
+    entrypoint: ./entrypoint.sh
+    environment:
+      HOME: /home/coder
+      DOCKER_USER: $DOCKER_USER
+      SSH_PORT: 12345 # ホストの SSH ポート番号
+      HOSTNAME: $HOSTNAME # ホスト名
+    labels:
+      traefik.enable: true
+      traefik.http.routers.code.rule: Host(`code.$DOMAIN`)
+      traefik.http.routers.code.entrypoints: https
+      traefik.http.routers.code.middlewares: authelia@docker
+      traefik.http.routers.code.service: code
+      traefik.http.services.code.loadbalancer.server.port: 7000
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsSL http://localhost:7000/robots.txt']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
