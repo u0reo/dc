@@ -1,0 +1,39 @@
+services:
+  adguardhome:
+    container_name: adguardhome
+    hostname: adguardhome
+    image: adguard/adguardhome:latest
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
+      - 853:853/tcp # DNS-over-TLS
+      - 853:853/udp # DNS-over-QUIC
+      - 8443:8443/tcp # HTTPS: Dashboard & DNS-over-HTTPS
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/certificates:/etc/certificates:ro
+      - /opt/dc/adguardhome/configs:/opt/adguardhome/conf:rw
+      - /opt/dc/adguardhome/data:/opt/adguardhome/work:rw
+    labels:
+      traefik.enable: true
+      traefik.http.routers.dns.rule: Host(`dns.$DOMAIN`)
+      traefik.http.routers.dns.entrypoints: https
+      traefik.http.routers.dns.service: dns
+      traefik.http.services.dns.loadbalancer.server.port: 80
+    healthcheck:
+      test:
+        - 'CMD-SHELL'
+        - |
+          nc -zv  localhost 53 &&
+          nc -zvu localhost 53 &&
+          nc -zv  localhost 80 &&
+          nc -zv  localhost 853 &&
+          nc -zvu localhost 853 &&
+          nc -zv  localhost 8443
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
