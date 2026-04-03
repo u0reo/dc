@@ -30,10 +30,12 @@ services:
       - --global.sendAnonymousUsage=false # 使用状況を送信しない
       - --entrypoints.http=true # HTTPで待ち受け
       - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
+      - --entrypoints.http.http.middlewares=checkip@file # IP制限ミドルウェアを適用
       - --entrypoints.http.http.redirections.entrypoint.to=https # HTTPはHTPSにリダイレクト
       - --entrypoints.http.http.redirections.entrypoint.scheme=https # HTTPはHTPSにリダイレクト
       - --entrypoints.https=true # HTTPSで待ち受け
       - --entrypoints.https.address=:443 # HTTPSは443ポートで待ち受け
+      - --entrypoints.https.http.middlewares=checkip@file # IP制限ミドルウェアを適用
       - --entrypoints.https.http.tls=true # HTTPSはTLSを有効化
       - --entrypoints.https.http.tls.certResolver=letsencrypt # HTTPSは「letsencrypt」の証明書を使用
       - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
