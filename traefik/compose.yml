@@ -26,6 +26,7 @@ services:
     command:
       - --ping=true # HealthCheck用にping機能を有効化
       - --api.insecure=true # API/ダッシュボードを有効化
+      - --global.checkNewVersion=false # 新しいバージョンの確認を無効化
       - --global.sendAnonymousUsage=false # 使用状況を送信しない
       - --entrypoints.http=true # HTTPで待ち受け
       - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
@@ -50,6 +51,9 @@ services:
       - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
+      - --experimental.plugins.geoblock.moduleName=github.com/david-garcia-garcia/traefik-geoblock
+      - --experimental.plugins.geoblock.version=v1.1.4
+      - --experimental.plugins.geoblock.settings.useunsafe=true
     environment:
       # ゾーン>>DNS(読み書き) と ゾーン>>ゾーン(読み取り) の権限が必要
       # https://dash.cloudflare.com/profile/api-tokens
