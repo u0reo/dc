@@ -10,7 +10,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /opt/dc/myspeed/data:/myspeed/data
+      - /opt/dc/myspeed/data:/myspeed/data:rw
     labels:
       traefik.enable: true
       traefik.http.routers.myspeed.rule: Host(`myspeed.$DOMAIN`)
