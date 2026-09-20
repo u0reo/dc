@@ -28,14 +28,13 @@ services:
       test:
         - 'CMD-SHELL'
         - |
-          netstat -tln | grep -qE '[:.](53|80|853|8443)[[:space:]]' &&
+          netstat -tln | grep -q ':53[[:space:]]' &&
           netstat -tln | grep -q ':80[[:space:]]' &&
+          netstat -tln | grep -q ':853[[:space:]]' &&
           netstat -tln | grep -q ':8443[[:space:]]' &&
-          netstat -tln | grep -qE ':853[[:space:]]' &&
           netstat -uln | grep -qE '[:.]53[[:space:]]' &&
           netstat -uln | grep -qE '[:.]853[[:space:]]' &&
-          printf '\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01' \
-            | nc -w 2 -u localhost 53 | grep -q example
+          nslookup example.localhost localhost >/dev/null 2>&1
       interval: 30s
       timeout: 3s
       retries: 3
