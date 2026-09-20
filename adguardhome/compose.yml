@@ -24,19 +24,16 @@ services:
       traefik.http.routers.dns.service: dns
       traefik.http.services.dns.loadbalancer.server.port: 80
     healthcheck:
-      # - UDP:53/853 `nc -zvu` はエラーログのもととなったため、廃止
-      # - UDP:53 は実際の DNS クエリ（A example.com）を送って応答を確認
-      # - TCP は nc で接続確認のみ（853/8443 の TLS ハンドシェイクは行わない）
-      # - UDP:853 (QUIC) は検証手段がないためチェックしない
+      # DNS の実動作確認のみ、正しい DNS クエリ（A example.com）を UDP:53 に送信
       test:
         - 'CMD-SHELL'
         - |
-          nc -zv localhost 53 &&
-          # nc -zvu localhost 53 &&
-          nc -zv localhost 80 &&
-          # nc -zv  localhost 853 &&
-          # nc -zvu localhost 853 &&
-          nc -zv localhost 8443 &&
+          netstat -tln | grep -qE '[:.](53|80|853|8443)[[:space:]]' &&
+          netstat -tln | grep -q ':80[[:space:]]' &&
+          netstat -tln | grep -q ':8443[[:space:]]' &&
+          netstat -tln | grep -qE ':853[[:space:]]' &&
+          netstat -uln | grep -qE '[:.]53[[:space:]]' &&
+          netstat -uln | grep -qE '[:.]853[[:space:]]' &&
           printf '\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01' \
             | nc -w 2 -u localhost 53 | grep -q example
       interval: 30s
