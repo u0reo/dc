@@ -15,6 +15,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /opt/dc/traefik/configs:/configs:ro
       - /opt/dc/traefik/certificates:/certificates:rw
+      - /opt/dc/traefik/geodata:/geodata:ro # geoblock v1.2.1: IP2Location DB seed
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
     # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
     # labels:
@@ -53,13 +54,17 @@ services:
       - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
+      # https://doc.traefik.io/traefik/master/reference/install-configuration/experimental/plugins/
+      # https://github.com/david-garcia-garcia/traefik-geoblock
       - --experimental.plugins.geoblock.moduleName=github.com/david-garcia-garcia/traefik-geoblock
-      - --experimental.plugins.geoblock.version=v1.1.4
+      - --experimental.plugins.geoblock.version=v1.2.1
       - --experimental.plugins.geoblock.settings.useunsafe=true
     environment:
+      GOMEMLIMIT: 2GiB # GoのGC目標上限（Yaegiプラグイン起因の過剰確保対策）
       # ゾーン>>DNS(読み書き) と ゾーン>>ゾーン(読み取り) の権限が必要
       # https://dash.cloudflare.com/profile/api-tokens
       CLOUDFLARE_DNS_API_TOKEN: $CLOUDFLARE_API_TOKEN
+    mem_limit: 3g # Dockerハード制限（GOMEMLIMIT+オフヒープ分の余裕。deploy.resources は非swarmでは効かない）
     healthcheck:
       test: ['CMD-SHELL', 'traefik healthcheck --ping']
       interval: 30s
