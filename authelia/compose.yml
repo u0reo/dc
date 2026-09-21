@@ -23,6 +23,7 @@ services:
       traefik.http.middlewares.authelia.forwardauth.address: http://172.17.0.1:9091/api/verify?rd=https%3A%2F%2Fauth.$DOMAIN%2F
       traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: true
       traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Name,Remote-Email
+      traefik.http.middlewares.authelia.forwardauth.maxResponseBodySize: 2097152  # 2MiB: 制限なしだと DoS/メモリ枯渇の恐れ
     environment:
       X_AUTHELIA_CONFIG: /opt/configs/  # 構成ファイルの存在するディレクトリのパス
       X_AUTHELIA_CONFIG_FILTERS: template  # identity-providersなどで使われるテンプレートエンジンで使用
