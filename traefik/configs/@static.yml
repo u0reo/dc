@@ -1,0 +1,20 @@
+http:
+  serversTransports:
+    # https://community.traefik.io/t/internal-server-error-when-proxing-to-https-with-self-signed-cert/11087/5
+    insecureTransport:
+      insecureSkipVerify: true
+  # ファイルでのみ構成可能
+  middlewares:
+    # https://doc.traefik.io/traefik/middlewares/http/ratelimit/
+    rateLimit:
+      rateLimit:
+        average: 20 # IPあたり平常時20リクエスト/10秒まで
+        burst: 50 # バースト時は最大50リクエストまで許容、超過分は429
+        period: 10s # レートリミットを10秒単位で適用
+entrypoints:
+  http:
+    http:
+      middleware: rateLimit@file
+  https:
+    http:
+      middleware: rateLimit@file
