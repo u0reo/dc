@@ -2,22 +2,23 @@ services:
   traefik:
     container_name: traefik
     hostname: traefik
-    image: traefik:v3.6
+    image: traefik:v3.7
     restart: unless-stopped
     network_mode: host # IPv6対応
     ports:
       - 80:80/tcp # HTTP
       - 443:443/tcp # HTTPS
       - 443:443/udp # HTTPS3
+      - 127.0.0.1:8080:8080/tcp # Traefik Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /opt/dc/traefik/configs:/configs:ro
       - /opt/dc/traefik/certificates:/certificates:rw
-      - /opt/dc/traefik/geodata:/geodata:ro # geoblock v1.2.1: IP2Location DB seed
+      - /opt/dc/traefik/logs:/logs:rw
     # network_mode: hostで運用する場合、ここのlabelsは読み込まれないので
-    # ダッシュボード等を使いたい場合はservice: api@internalとしたルートファイルの作成が必要
+    # ダッシュボード等を使いたい場合は service: api@internal を含んだルートファイルの作成が必要
     # labels:
     #   traefik.enable: true
     #   traefik.http.routers.traefik.rule: Host(`traefik.$DOMAIN`)
@@ -27,16 +28,15 @@ services:
     command:
       - --ping=true # HealthCheck用にping機能を有効化
       - --api.insecure=true # API/ダッシュボードを有効化
+      - --core.strictTLSOptions=true # TLSオプションを厳格に
       - --global.checkNewVersion=false # 新しいバージョンの確認を無効化
       - --global.sendAnonymousUsage=false # 使用状況を送信しない
       - --entrypoints.http=true # HTTPで待ち受け
       - --entrypoints.http.address=:80 # HTTPは80ポートで待ち受け
-      - --entrypoints.http.http.middlewares=checkip@file # IP制限ミドルウェアを適用
       - --entrypoints.http.http.redirections.entrypoint.to=https # HTTPはHTPSにリダイレクト
       - --entrypoints.http.http.redirections.entrypoint.scheme=https # HTTPはHTPSにリダイレクト
       - --entrypoints.https=true # HTTPSで待ち受け
       - --entrypoints.https.address=:443 # HTTPSは443ポートで待ち受け
-      - --entrypoints.https.http.middlewares=checkip@file # IP制限ミドルウェアを適用
       - --entrypoints.https.http.tls=true # HTTPSはTLSを有効化
       - --entrypoints.https.http.tls.certResolver=letsencrypt # HTTPSは「letsencrypt」の証明書を使用
       - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
@@ -44,6 +44,10 @@ services:
       - --entrypoints.https.http3=true # HTTP3対応
       - --log=true # ログの出力を有効化
       - --log.level=INFO # ログのレベルを設定
+      - --accesslog=true # アクセスログを有効化
+      - --accesslog.filepath=/logs/access.log # アクセスログの出力先
+      - --accesslog.bufferingsize=100 # 一定件数ためて書き込みディスクI/Oを削減
+      - --accesslog.filters.statuscodes=400-599 # 特定ステータスのみ残す場合のみ有効化（未指定=全件）
       - --providers.docker=true # Dockerサポートを有効化
       - --providers.docker.exposedByDefault=false # 構成なしにプロキシしない
       - --providers.file.directory=/configs # 動的構成ファイル追加先を指定
@@ -54,17 +58,10 @@ services:
       - --certificatesResolvers.letsencrypt.acme.dnschallenge=true # DNS-01チャレンジを有効化
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare # CloudflareのAPIを使用
       - --certificatesResolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53 # 名前解決にCloudflareのDNSを使用
-      # https://doc.traefik.io/traefik/master/reference/install-configuration/experimental/plugins/
-      # https://github.com/david-garcia-garcia/traefik-geoblock
-      - --experimental.plugins.geoblock.moduleName=github.com/david-garcia-garcia/traefik-geoblock
-      - --experimental.plugins.geoblock.version=v1.2.1
-      - --experimental.plugins.geoblock.settings.useunsafe=true
     environment:
-      GOMEMLIMIT: 2GiB # GoのGC目標上限（Yaegiプラグイン起因の過剰確保対策）
       # ゾーン>>DNS(読み書き) と ゾーン>>ゾーン(読み取り) の権限が必要
       # https://dash.cloudflare.com/profile/api-tokens
       CLOUDFLARE_DNS_API_TOKEN: $CLOUDFLARE_API_TOKEN
-    mem_limit: 3g # Dockerハード制限（GOMEMLIMIT+オフヒープ分の余裕。deploy.resources は非swarmでは効かない）
     healthcheck:
       test: ['CMD-SHELL', 'traefik healthcheck --ping']
       interval: 30s
