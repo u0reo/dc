@@ -46,6 +46,13 @@ services:
       - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
       - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAIN
       - --entrypoints.https.http.aliasHeadersStrategy=delete # ヘッダーエイリアス偽装対策
+      - --entrypoints.https.http.encodedCharacters.allowEncodedSlash=false # / (スラッシュ) を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedBackSlash=false # \ (バックスラッシュ) を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedNullCharacter=false # NULL 文字を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedSemicolon=false # ; (セミコロン) を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedQuestionMark=false # ? (クエスチョンマーク) を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedHash=false # # (ハッシュ) を拒否
+      - --entrypoints.https.http.encodedCharacters.allowEncodedPercent=true # % (パーセント) を許可
       - --entrypoints.https.http3=true # HTTP3対応
       - --log=true # ログの出力を有効化
       - --log.level=INFO # ログのレベルを設定
