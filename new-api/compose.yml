@@ -1,0 +1,65 @@
+services:
+  new-api:
+    container_name: new-api
+    hostname: new-api
+    image: calciumion/new-api:latest
+    restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
+    networks:
+      - new-api
+    expose:
+      - 3000
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/new-api/data:/data:rw
+    labels:
+      traefik.enable: true
+      traefik.http.routers.new-api.rule: Host(`new-api.$DOMAIN`)
+      traefik.http.routers.new-api.entrypoints: https
+    environment:
+      TZ: $TZ
+      SESSION_SECRET: "${SESSION_SECRET}" # 個人利用なのでSQLite (SQL_DSNを設定しなければSQLiteを使用)
+      ERROR_LOG_ENABLED: true
+      CHANNEL_TEST_FREQUENCY: 15
+    healthcheck:
+      test: [ 'CMD-SHELL', 'wget -q -O - http://127.0.0.1:3000/api/status | grep "\"success\":\\s*true" || exit 1' ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      codex-proxy:
+        condition: service_healthy
+
+  codex-proxy:
+    container_name: codex-proxy
+    hostname: codex-proxy
+    build:
+      dockerfile: codex-proxy.Dockerfile
+      args:
+        CODEX_PROXY_REF: 1.1.0 # 固定したリリースタグ／コミット
+    restart: unless-stopped
+    user: 1000:1000
+    networks:
+      - new-api
+    expose:
+      - 9879
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /opt/dc/new-api/codex-proxy/auth.json:/config/codex-oauth-proxy/auth.json:rw
+    environment:
+      TZ: $TZ
+      ADMIN_API_KEY: internal-only
+      XDG_CONFIG_HOME: /config
+      PORT: "9879"
+    healthcheck:
+      test: [ 'CMD-SHELL', 'wget -q -O - http://127.0.0.1:9879/health' ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+
+networks:
+  new-api:
