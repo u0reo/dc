@@ -1,7 +1,7 @@
 FROM golang:1.27-alpine AS builder
 
 ARG CODEX_PROXY_REPO=https://github.com/dvcrn/codex-oauth-proxy.git
-ARG CODEX_PROXY_REF=main
+ARG CODEX_PROXY_REF=1.1.0
 
 RUN apk add --no-cache git ca-certificates
 

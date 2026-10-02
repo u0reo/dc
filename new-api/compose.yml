@@ -29,16 +29,13 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
-      codex-proxy:
+      codex-oauth-proxy:
         condition: service_healthy
 
-  codex-proxy:
-    container_name: codex-proxy
-    hostname: codex-proxy
-    build:
-      dockerfile: codex-proxy.Dockerfile
-      args:
-        CODEX_PROXY_REF: 1.1.0 # 固定したリリースタグ／コミット
+  codex-oauth-proxy:
+    container_name: codex-oauth-proxy
+    hostname: codex-oauth-proxy
+    image: ureo/codex-oauth-proxy:latest
     restart: unless-stopped
     user: 1000:1000
     networks:
@@ -48,7 +45,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /opt/dc/new-api/codex-proxy/auth.json:/config/codex-oauth-proxy/auth.json:rw
+      - /opt/dc/new-api/codex-oauth-proxy/auth.json:/config/codex-oauth-proxy/auth.json:rw
     environment:
       TZ: $TZ
       ADMIN_API_KEY: internal-only

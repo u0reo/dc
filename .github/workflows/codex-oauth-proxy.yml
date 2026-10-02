@@ -1,0 +1,97 @@
+name: Docker Build (codex-oauth-proxy)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+    paths:
+      - new-api/codex-oauth-proxy.Dockerfile
+      - new-api/.dockerignore
+      - .github/workflows/codex-oauth-proxy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/codex-oauth-proxy
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Dockerfile の ARG CODEX_PROXY_REF をイメージタグに使用する (例: 1.1.0)
+      - name: Read CODEX_PROXY_REF from Dockerfile
+        id: proxy_ref
+        run: |
+          set -euo pipefail
+          ref="$(grep -E '^[[:space:]]*ARG[[:space:]]+CODEX_PROXY_REF[[:space:]]*=' \
+            new-api/codex-oauth-proxy.Dockerfile | head -n1)"
+          ref="${ref##*=}"
+          # 引用符・CRLF・前後の空白を除去
+          ref="${ref//$'\r'/}"
+          ref="${ref//\"/}"
+          ref="${ref//\'/}"
+          ref="${ref//[[:space:]]/}"
+          if [ -z "$ref" ]; then
+            echo "::error::CODEX_PROXY_REF が Dockerfile 内にありません"
+            exit 1
+          fi
+          echo "Using CODEX_PROXY_REF=${ref}"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.proxy_ref.outputs.ref }}
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # :main / :latest / :<tag> / :<sha> / :<CODEX_PROXY_REF> を付与して push
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: ./new-api
+          file: ./new-api/codex-oauth-proxy.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+
+      - name: Docker Hub Description
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.IMAGE }}
+          short-description: ${{ github.event.repository.description }}

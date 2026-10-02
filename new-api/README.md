@@ -72,24 +72,24 @@ flowchart TB
 ```text
 ai-gateway/
 ├── compose.yml
-├── codex-proxy.Dockerfile
+├── codex-oauth-proxy.Dockerfile
 ├── .env
 ├── .gitignore
 ├── data/  # New API のデータ（SQLite DB / ログ）
-└── codex-proxy/auth.json  # 手順 3 で生成する（Git 追跡しない）
+└── codex-oauth-proxy/auth.json  # 手順 3 で生成する（Git 追跡しない）
 ```
 
 作業ディレクトリへ移動し、権限を整えます。
 
 ```sh
 cd new-api
-mkdir -p data codex-proxy
-chown -R 1000:1000 data codex-proxy
+mkdir -p data codex-oauth-proxy
+chown -R 1000:1000 data codex-oauth-proxy
 ```
 
 > [!IMPORTANT]
 > コンテナは UID/GID `1000` で動作します（root 実行を避けるため）。
-> `data/` と `codex-proxy/auth.json` の所有者を `1000:1000` に一致させてください。
+> `data/` と `codex-oauth-proxy/auth.json` の所有者を `1000:1000` に一致させてください。
 
 ---
 
@@ -141,7 +141,7 @@ docker run --rm -it \
   -e HOME=/tmp \
   -e CODEX_HOME=/codex \
   -e npm_config_cache=/tmp/.npm \
-  -v "$PWD/codex-proxy:/codex" \
+  -v "$PWD/codex-oauth-proxy:/codex" \
   node:slim \
   sh -lc '
     apt-get update >/dev/null &&
@@ -156,14 +156,14 @@ docker run --rm -it \
 生成されたことを確認します。
 
 ```sh
-test -s ./codex-proxy/auth.json && echo "auth.json: OK"
+test -s ./codex-oauth-proxy/auth.json && echo "auth.json: OK"
 ```
 
 権限を絞ります。
 
 ```sh
-chmod 600 ./codex-proxy/auth.json
-chown 1000:1000 ./codex-proxy/auth.json
+chmod 600 ./codex-oauth-proxy/auth.json
+chown 1000:1000 ./codex-oauth-proxy/auth.json
 ```
 
 > [!NOTE]
@@ -182,7 +182,7 @@ docker run --rm -it \
   -e CODEX_HOME=/codex \
   -e npm_config_cache=/tmp/.npm \
   -p 1455:1455 \
-  -v "$PWD/codex-proxy:/codex" \
+  -v "$PWD/codex-oauth-proxy:/codex" \
   node:slim \
   sh -lc '
     apt-get update >/dev/null &&
@@ -208,19 +208,19 @@ docker compose ps
 
 ```text
 new-api       ...   healthy
-codex-proxy   ...   healthy
+codex-oauth-proxy   ...   healthy
 ```
 
 内部ネットワークからの疎通確認:
 
 ```sh
-docker compose exec new-api wget -q -O - http://codex-proxy:9879/health
+docker compose exec new-api wget -q -O - http://codex-oauth-proxy:9879/health
 ```
 
 ログ確認:
 
 ```sh
-docker compose logs --tail=100 codex-proxy
+docker compose logs --tail=100 codex-oauth-proxy
 ```
 
 > [!IMPORTANT]
@@ -242,7 +242,7 @@ Codex OAuth Proxy には 2 種類の認証があります。
 
 ### 5.2 `ADMIN_API_KEY` — New API → Proxy 間の認証
 
-- `compose.yml` の `codex-proxy.environment` に直接書く（`.env` は使わない）
+- `compose.yml` の `codex-oauth-proxy.environment` に直接書く（`.env` は使わない）
 - 値は `internal-only`。Compose で定義した閉鎖ネットワーク内でのみ使い、 `ports:` で公開しないため外部から到達できません
 - Channel 登録時に、同じ値 `internal-only` を API Key として指定する
 - 公開リポジトリへ載せる前提ではない — 閉鎖ネットワーク内の識別子にすぎません
@@ -279,14 +279,14 @@ New API の管理画面から OpenAI Compatible 形式の Channel を追加し�
 |---|---|
 | Name | `Codex OAuth`（任意） |
 | Type | OpenAI / OpenAI Compatible |
-| Base URL | `http://codex-proxy:9879`（UI が `/v1` を要求する場合は `http://codex-proxy:9879/v1`） |
+| Base URL | `http://codex-oauth-proxy:9879`（UI が `/v1` を要求する場合は `http://codex-oauth-proxy:9879/v1`） |
 | API Key | `internal-only`（`compose.yml` の `ADMIN_API_KEY` と同じ値） |
 | Models | `/v1/models` の出力から取得 |
 
 モデル ID を推測せず、必ず `/v1/models` の結果を使います。
 
 ```sh
-docker compose exec new-api wget -q -O - --header="Authorization: Bearer internal-only" http://codex-proxy:9879/v1/models
+docker compose exec new-api wget -q -O - --header="Authorization: Bearer internal-only" http://codex-oauth-proxy:9879/v1/models
 ```
 
 > [!NOTE]
@@ -463,9 +463,9 @@ docker compose up -d        # 起動
 docker compose down         # 停止
 docker compose ps           # 状態
 docker compose logs -f      # 全ログ
-docker compose logs -f codex-proxy
+docker compose logs -f codex-oauth-proxy
 docker compose logs -f new-api
-docker compose restart codex-proxy
+docker compose restart codex-oauth-proxy
 ```
 
 ## 13. 更新
@@ -474,16 +474,16 @@ docker compose restart codex-proxy
 docker compose build --pull && docker compose up -d
 ```
 
-`codex-proxy.Dockerfile` の `CODEX_PROXY_REF` を新しいタグ／コミットへ変更してから再ビルドします。
+`codex-oauth-proxy.Dockerfile` の `CODEX_PROXY_REF` を新しいタグ／コミットへ変更してから再ビルドします。
 
 # トラブルシューティング
 
-## `codex-proxy` が unhealthy
+## `codex-oauth-proxy` が unhealthy
 
 ```sh
-docker compose logs --tail=200 codex-proxy
-docker compose exec new-api wget -q -O - http://codex-proxy:9879/health
-docker compose exec new-api getent hosts codex-proxy
+docker compose logs --tail=200 codex-oauth-proxy
+docker compose exec new-api wget -q -O - http://codex-oauth-proxy:9879/health
+docker compose exec new-api getent hosts codex-oauth-proxy
 ```
 
 DNS 解決できない場合は、両サービスが同じ **名前付き Docker ネットワーク** に参加しているかどうかを確認してください（上記 `compose.yml` の `networks.new-api`）。
@@ -493,20 +493,20 @@ DNS 解決できない場合は、両サービスが同じ **名前付き Docker
 ホスト側:
 
 ```sh
-ls -ln codex-proxy/auth.json  # UID=1000 GID=1000 であることを確認
-chown 1000:1000 codex-proxy/auth.json
-chmod 600 codex-proxy/auth.json
+ls -ln codex-oauth-proxy/auth.json  # UID=1000 GID=1000 であることを確認
+chown 1000:1000 codex-oauth-proxy/auth.json
+chmod 600 codex-oauth-proxy/auth.json
 ```
 
 コンテナ側:
 
 ```sh
-docker compose exec codex-proxy id  # uid=1000
+docker compose exec codex-oauth-proxy id  # uid=1000
 ```
 
 ## ChatGPT OAuth が失敗する
 
-`docker compose logs codex-proxy` の 401 / token 関連の出力を確認し、§3.1 の device login を再実行してください。
+`docker compose logs codex-oauth-proxy` の 401 / token 関連の出力を確認し、§3.1 の device login を再実行してください。
 Workspace で device auth が禁止されている場合はこの方式ではログインできません（§3.2 を使用）。
 
 ## Authelia から New API に戻れない（callback エラー）
