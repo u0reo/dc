@@ -23,6 +23,7 @@ services:
       traefik.http.routers.dns.entrypoints: https
       traefik.http.routers.dns.service: dns
       traefik.http.services.dns.loadbalancer.server.port: 80
+      adguardhome-autoheal: true
     healthcheck:
       # DNS の実動作確認のみ、正しい DNS クエリ（A example.com）を UDP:53 に送信
       test:
@@ -39,3 +40,30 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+
+  # healthcheck が unhealthy になったコンテナを自動で再起動する
+  autoheal:
+    container_name: adguardhome-autoheal
+    hostname: adguardhome-autoheal
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    network_mode: none
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # 監視対象はをラベルで絞り込み
+      AUTOHEAL_CONTAINER_LABEL: adguardhome-autoheal
+      # 監視間隔（秒）
+      AUTOHEAL_INTERVAL: 30
+      # 起動直後の猶予（秒）
+      AUTOHEAL_START_PERIOD: 10
+      # 監視対象が停止中でも再起動するかどうか
+      AUTOHEAL_ONLY_MONITOR_RUNNING: true
+    healthcheck:
+      test: [ 'CMD-SHELL', 'grep -qa "autoheal" /proc/1/cmdline && test -S /var/run/docker.sock' ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
