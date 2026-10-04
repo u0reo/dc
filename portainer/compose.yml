@@ -72,7 +72,7 @@ services:
     environment:
       AGENT_SECRET: $AGENT_SECRET
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q --no-check-certificate https://localhost:9001/ping 2>&1 | grep "403 Forbidden"']
+      test: [ 'CMD-SHELL', 'wget -q -Y off -O - --no-check-certificate https://localhost:9001/ping 2>&1' ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -96,7 +96,7 @@ services:
       EDGE_KEY: $EDGE_KEY
       AGENT_SECRET: $AGENT_SECRET
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q --no-check-certificate https://localhost:9001/ping 2>&1 | grep "403 Forbidden"']
+      test: [ 'CMD-SHELL', 'wget -q -Y off -O - --no-check-certificate https://localhost:9001/ping 2>&1' ]
       interval: 30s
       timeout: 10s
       retries: 3
