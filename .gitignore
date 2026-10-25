@@ -2,7 +2,9 @@
 !/*/**/
 !/*/**/.gitkeep
 !/*/example/**/*
-!/*/**/*.example*
+!/*/**/*example*
+!/traefik/plugins-local/**
+!/.github/**
 !/*/*
 
 /**/.env*

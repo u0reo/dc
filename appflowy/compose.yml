@@ -1,0 +1,444 @@
+services:
+  # AppFlowy Web (SPA) — 公式nginx の location /
+  web:
+    container_name: appflowy-web
+    hostname: appflowy-web
+    image: appflowyinc/appflowy_web:${IMG_VER:-latest}
+    restart: unless-stopped
+    networks:
+      # - default
+      - appflowy
+    expose:
+      - 80
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      TZ: $TZ
+      APPFLOWY_BASE_URL: https://appflowy.$DOMAIN
+      APPFLOWY_GOTRUE_BASE_URL: https://appflowy.$DOMAIN/gotrue
+      APPFLOWY_WS_BASE_URL: wss://appflowy.$DOMAIN/ws/v2
+    labels:
+      traefik.enable: true
+      # 公式nginx の location / 相当 (他の PathPrefix より優先度が低く、最後にマッチ)
+      traefik.http.routers.appflowy-web.rule: Host(`appflowy.$DOMAIN`)
+      traefik.http.routers.appflowy-web.entrypoints: https
+    healthcheck:
+      test: 'bash -c "exec 3<>/dev/tcp/127.0.0.1/80 && exec 3>&-"'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      cloud:
+        condition: service_healthy
+
+  # Admin Console — 公式nginx の location /console
+  admin-frontend:
+    container_name: appflowy-admin-frontend
+    hostname: appflowy-admin-frontend
+    image: appflowyinc/admin_frontend:${IMG_VER:-latest}
+    restart: unless-stopped
+    networks:
+      # - default
+      - appflowy
+    expose:
+      - ${ADMIN_FRONTEND_PORT:-3000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      TZ: $TZ
+      # Next.js はリッスンポートのバインド先を HOSTNAME 環境変数で決定
+      HOSTNAME: 0.0.0.0
+      ADMIN_FRONTEND_PORT: ${ADMIN_FRONTEND_PORT:-3000}
+      APPFLOWY_GOTRUE_BASE_URL: http://gotrue:${GOTRUE_PORT:-9999}
+      APPFLOWY_BASE_URL: https://appflowy.$DOMAIN
+    labels:
+      traefik.enable: true
+      traefik.http.routers.appflowy-console.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/console`)
+      traefik.http.routers.appflowy-console.entrypoints: https
+    healthcheck:
+      test: 'wget -q -Y off -O - http://127.0.0.1:${ADMIN_FRONTEND_PORT:-3000}/console'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+    depends_on:
+      gotrue:
+        condition: service_healthy
+      cloud:
+        condition: service_healthy
+
+  # ============================================================ アプリケーション本体
+
+  # AppFlowy Cloud API — 公式nginx の location /api, /ws, /ai
+  # https://appflowy.com/docs/How-to-install-AppFlowyCloud-using-Coolify
+  cloud:
+    container_name: appflowy-cloud
+    hostname: appflowy-cloud
+    image: appflowyinc/appflowy_cloud:${IMG_VER:-latest}
+    restart: unless-stopped
+    networks:
+      # - default
+      - appflowy
+    expose:
+      - 8000
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+      - /var/run/redis/redis.sock:/tmp/redis-server.sock:ro
+    environment:
+      TZ: $TZ
+      RUST_LOG: ${LOG_LEVEL:-info}
+      APPFLOWY_ENVIRONMENT: production
+      # --- 内部で使用する URL ---
+      APPFLOWY_DATABASE_URL: postgres://appflowy:${POSTGRES_PASSWORD}@localhost/appflowy?host=/tmp
+      APPFLOWY_REDIS_URI: unix:///tmp/redis-server.sock?db=${REDIS_DB:-8}
+      # --- 認証 (GoTrue) ---
+      APPFLOWY_GOTRUE_JWT_SECRET: $GOTRUE_JWT_SECRET
+      APPFLOWY_GOTRUE_BASE_URL: http://gotrue:${GOTRUE_PORT:-9999}
+      # --- S3 (VersityGW) ---
+      APPFLOWY_S3_CREATE_BUCKET: 'true'
+      APPFLOWY_S3_USE_MINIO: 'true'  # S3 互換 (path-style) クライアントとして versitygw へ接続
+      APPFLOWY_S3_MINIO_URL: http://s3:7000  # presigned URL はこの internal URL に対して署名
+      APPFLOWY_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-appflowy}
+      APPFLOWY_S3_SECRET_KEY: $S3_SECRET_KEY
+      APPFLOWY_S3_BUCKET: appflowy
+      APPFLOWY_S3_REGION: us-east-1
+      APPFLOWY_S3_PRESIGNED_URL_ENDPOINT: https://appflowy.$DOMAIN/s3-api  # 外部から接続する時の URL
+      # --- メール ---
+      APPFLOWY_MAILER_SMTP_HOST: $SMTP_HOST
+      APPFLOWY_MAILER_SMTP_PORT: ${SMTP_PORT:-465}
+      APPFLOWY_MAILER_SMTP_EMAIL: no-reply@appflowy.$DOMAIN
+      APPFLOWY_MAILER_SMTP_USERNAME: $SMTP_USER
+      APPFLOWY_MAILER_SMTP_PASSWORD: $SMTP_PASS
+      APPFLOWY_MAILER_SMTP_TLS_KIND: ${SMTP_TLS_KIND:-wrapper}  # デフォルトは最初から TLS
+      # --- AI ---
+      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_SERVER_HOST: ai
+      AI_SERVER_PORT: ${AI_SERVER_PORT:-5001}
+      AI_OPENAI_API_KEY: $AI_OPENAI_API_KEY
+      # --- 外部から見える URL (Traefik 経由) ---
+      APPFLOWY_WEB_URL: https://appflowy.$DOMAIN
+      APPFLOWY_BASE_URL: https://appflowy.$DOMAIN
+      # --- 検索 ---
+      APPFLOWY_SEARCH_SERVICE_URL: http://search:${APPFLOWY_SEARCH_PORT:-4002}
+      APPFLOWY_SEARCH_REQUEST_TIMEOUT_SECS: ${APPFLOWY_SEARCH_REQUEST_TIMEOUT_SECS:-10}
+      # --- 登録制限: 単一ユーザ運用なのでホワイトリスト + ゲスト招待承認を必須化 ---
+      SIGNUP_WHITELIST_ENABLED: 'true'
+      GUEST_INVITES_REQUIRE_ADMIN_APPROVAL: 'true'
+      # --- AI セマンティック検索の設定値 ---
+      APPFLOWY_EMBEDDING_CHUNK_SIZE: ${APPFLOWY_EMBEDDING_CHUNK_SIZE:-2000}
+      APPFLOWY_EMBEDDING_CHUNK_OVERLAP: ${APPFLOWY_EMBEDDING_CHUNK_OVERLAP:-200}
+      # --- その他 ---
+      APPFLOWY_ACCESS_CONTROL: 'true'
+      APPFLOWY_DATABASE_MAX_CONNECTIONS: ${APPFLOWY_DATABASE_MAX_CONNECTIONS:-10}
+      APPFLOWY_WEBSOCKET_MAILBOX_SIZE: ${APPFLOWY_WEBSOCKET_MAILBOX_SIZE:-6000}  # slow client 対策のバッファ数
+      APPFLOWY_COLLABORATE_REMOVE_BATCH_SIZE: ${APPFLOWY_COLLABORATE_REMOVE_BATCH_SIZE:-100}
+      # 音声データの文字起こしは無効: ASSEMBLYAI_API_KEY, ASSEMBLYAI_API_BASE, ASSEMBLYAI_STREAMING_API_BASE
+    labels:
+      traefik.enable: true
+      # 公式nginx の location /api 相当
+      traefik.http.routers.appflowy-api.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/api`)
+      traefik.http.routers.appflowy-api.entrypoints: https
+      # 公式nginx の location ~* ^/api/workspace/([a-zA-Z0-9_-]+)/publish$ (上限を大きく上げた専用ルート)
+      traefik.http.routers.appflowy-publish.rule: Host(`appflowy.$DOMAIN`) && PathRegexp(`^/api/workspace/[a-zA-Z0-9_-]+/publish$$`)
+      traefik.http.routers.appflowy-publish.entrypoints: https
+      # 公式nginx の location /api/chat, /api/import (SSE / 巨大インポート)
+      traefik.http.routers.appflowy-stream.rule: Host(`appflowy.$DOMAIN`) && (PathPrefix(`/api/chat`) || PathPrefix(`/api/import`))
+      traefik.http.routers.appflowy-stream.entrypoints: https
+      # 公式nginx の location /ws (Collab WebSocket)
+      traefik.http.routers.appflowy-ws.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/ws`)
+      traefik.http.routers.appflowy-ws.entrypoints: https
+      # 公式nginx の location /ai/ 相当
+      traefik.http.routers.appflowy-ai.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/ai/`)
+      traefik.http.routers.appflowy-ai.entrypoints: https
+      traefik.http.routers.appflowy-ai.middlewares: appflowy-ai-strip
+      traefik.http.middlewares.appflowy-ai-strip.stripprefix.prefixes: /ai
+    healthcheck:
+      test: 'curl -fsSLx "" http://127.0.0.1:${PORT:-8000}/api/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      gotrue:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+
+  # GoTrue (認証) — 公式nginx の location /gotrue/ + rewrite ^/gotrue(/.*)$ $1
+  gotrue:
+    container_name: appflowy-gotrue
+    hostname: appflowy-gotrue
+    image: appflowyinc/gotrue:${IMG_VER:-latest}
+    restart: unless-stopped
+    networks:
+      # - default
+      - appflowy
+    expose:
+      - ${GOTRUE_PORT:-9999}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+    environment:
+      TZ: $TZ
+      PORT: ${GOTRUE_PORT:-9999}
+      # --- アカウント ---
+      # 後から変更すると、別に新しい管理者アカウントが追加で作成するため、変更しない
+      GOTRUE_ADMIN_EMAIL: $GOTRUE_ADMIN_EMAIL
+      GOTRUE_ADMIN_PASSWORD: $GOTRUE_ADMIN_PASSWORD
+      GOTRUE_DISABLE_SIGNUP: 'true'  # 単一ユーザ運用
+      # --- URI 関連 ---
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-appflowy-flutter://}  # AppFlowy デスクトップアプリ / console へ戻すための URL
+      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-**}
+      # --- JWT トークン ---
+      GOTRUE_JWT_SECRET: $GOTRUE_JWT_SECRET
+      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-604800}  # 1週間: 60 * 60 * 24 * 7
+      # これが無いと createuser が supabase_admin ではないロールを作る
+      GOTRUE_JWT_ADMIN_GROUP_NAME: supabase_admin
+      # データベースのドライバ
+      GOTRUE_DB_DRIVER: postgres
+      # 外部アクセス URL
+      API_EXTERNAL_URL: https://appflowy.$DOMAIN/gotrue
+      # データベース URL
+      DATABASE_URL: postgres://appflowy:${POSTGRES_PASSWORD}@localhost/appflowy?sslmode=disable&search_path=auth&host=/tmp
+      # --- メール ---
+      GOTRUE_SMTP_HOST: $SMTP_HOST
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-465}
+      GOTRUE_SMTP_USER: $SMTP_USER
+      GOTRUE_SMTP_PASS: $SMTP_PASS
+      GOTRUE_SMTP_ADMIN_EMAIL: no-reply@appflowy.$DOMAIN
+      GOTRUE_SMTP_MAX_FREQUENCY: ${GOTRUE_SMTP_MAX_FREQUENCY:-10s}
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /gotrue/verify
+      GOTRUE_MAILER_URLPATHS_INVITE: /gotrue/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /gotrue/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /gotrue/verify
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: ${GOTRUE_MAILER_TEMPLATES_MAGIC_LINK:-}
+      GOTRUE_MAILER_AUTOCONFIRM: 'false'
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: ${GOTRUE_RATE_LIMIT_EMAIL_SENT:-10}  # 毎分
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: 'false'
+      GOTRUE_EXTERNAL_GITHUB_ENABLED: 'false'
+      GOTRUE_EXTERNAL_DISCORD_ENABLED: 'false'
+      GOTRUE_SAML_ENABLED: 'false'
+      # --- パスキー (WebAuthn) ---
+      GOTRUE_WEBAUTHN_RP_ID: appflowy.$DOMAIN
+      GOTRUE_WEBAUTHN_RP_DISPLAY_NAME: AppFlowy
+      GOTRUE_WEBAUTHN_RP_ORIGINS: https://appflowy.$DOMAIN
+    labels:
+      traefik.enable: true
+      traefik.http.routers.appflowy-gotrue.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/gotrue`)
+      traefik.http.routers.appflowy-gotrue.entrypoints: https
+      traefik.http.routers.appflowy-gotrue.middlewares: appflowy-gotrue
+      # 公式 nginx の rewrite ^/gotrue(/.*)$ $1 break; 相当
+      traefik.http.middlewares.appflowy-gotrue.stripprefix.prefixes: /gotrue
+    healthcheck:
+      test: 'curl -fsSLx "" http://127.0.0.1:${PORT:-9999}/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+  # ============================================================ バックグラウンド (外部非公開)
+  worker:
+    container_name: appflowy-worker
+    hostname: appflowy-worker
+    # 4KBページ前提ビルドへの16KBビルドパッチ対応
+    # https://github.com/u0reo/appflowy-worker-builder
+    image: ureo/appflowy_worker_16k:${IMG_VER:-latest}
+    restart: unless-stopped
+    networks:
+      - appflowy
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+      - /var/run/redis/redis.sock:/tmp/redis-server.sock:ro
+    environment:
+      TZ: $TZ
+      RUST_LOG: ${LOG_LEVEL:-info}
+      APPFLOWY_ENVIRONMENT: production
+      APPFLOWY_WORKER_ENVIRONMENT: production
+      # --- データベースの URL ---
+      APPFLOWY_WORKER_REDIS_URL: unix:///tmp/redis-server.sock?db=${REDIS_DB:-8}
+      APPFLOWY_WORKER_DATABASE_URL: postgres://appflowy:${POSTGRES_PASSWORD}@localhost/appflowy?host=/tmp
+      APPFLOWY_WORKER_DATABASE_NAME: appflowy
+      # 新しいインポート依頼を Redis ストリームから取りに行く間隔
+      APPFLOWY_WORKER_IMPORT_TICK_INTERVAL: ${APPFLOWY_WORKER_IMPORT_TICK_INTERVAL:-60}
+      # --- S3 (VersityGW) ---
+      APPFLOWY_S3_USE_MINIO: 'true'
+      APPFLOWY_S3_MINIO_URL: http://s3:7000
+      APPFLOWY_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-appflowy}
+      APPFLOWY_S3_SECRET_KEY: $S3_SECRET_KEY
+      APPFLOWY_S3_BUCKET: appflowy
+      APPFLOWY_S3_REGION: us-east-1
+      # --- メール ---
+      APPFLOWY_MAILER_SMTP_HOST: $SMTP_HOST
+      APPFLOWY_MAILER_SMTP_PORT: ${SMTP_PORT:-465}
+      APPFLOWY_MAILER_SMTP_EMAIL: no-reply@appflowy.$DOMAIN
+      APPFLOWY_MAILER_SMTP_USERNAME: $SMTP_USER
+      APPFLOWY_MAILER_SMTP_PASSWORD: $SMTP_PASS
+      APPFLOWY_MAILER_SMTP_TLS_KIND: ${SMTP_TLS_KIND:-wrapper}  # デフォルトは最初から TLS
+      # --- AI セマンティック検索の設定値 ---
+      APPFLOWY_EMBEDDING_CHUNK_SIZE: ${APPFLOWY_EMBEDDING_CHUNK_SIZE:-2000}
+      APPFLOWY_EMBEDDING_CHUNK_OVERLAP: ${APPFLOWY_EMBEDDING_CHUNK_OVERLAP:-200}
+    depends_on:
+      cloud:
+        condition: service_healthy
+
+  # 検索 / インデクサ — cloud から http://search:$APPFLOWY_SEARCH_PORT でアクセス
+  search:
+    container_name: appflowy-search
+    hostname: appflowy-search
+    image: appflowyinc/appflowy_search:${IMG_VER_SEARCH:-latest}
+    restart: unless-stopped
+    networks:
+      - appflowy
+    expose:
+      - ${APPFLOWY_SEARCH_PORT:-4002}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+      - /var/run/redis/redis.sock:/tmp/redis-server.sock:ro
+      - ${REPO_PATH:-/opt/dc}/appflowy/keyword_index:/var/lib/appflowy/keyword_index:rw
+    environment:
+      TZ: $TZ
+      RUST_LOG: ${LOG_LEVEL:-info}
+      # --- リッスン設定 ---
+      APPFLOWY_SEARCH_HOST: ${APPFLOWY_SEARCH_HOST:-[::]}
+      APPFLOWY_SEARCH_PORT: ${APPFLOWY_SEARCH_PORT:-4002}
+      # --- データベース URL ---
+      APPFLOWY_SEARCH_DATABASE_URL: postgres://appflowy:${POSTGRES_PASSWORD}@localhost/appflowy?host=/tmp
+      APPFLOWY_SEARCH_REDIS_URL: unix:///tmp/redis-server.sock?db=${REDIS_DB:-8}
+      # AI の認証トークン
+      AI_OPENAI_API_KEY: $AI_OPENAI_API_KEY
+      # --- S3 (VersityGW) ---
+      # rebuild API が collab blob を読めるよう S3 を渡す
+      APPFLOWY_S3_USE_MINIO: 'true'
+      APPFLOWY_S3_MINIO_URL: http://s3:7000
+      APPFLOWY_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-appflowy}
+      APPFLOWY_S3_SECRET_KEY: $S3_SECRET_KEY
+      APPFLOWY_S3_BUCKET: appflowy
+      APPFLOWY_S3_REGION: us-east-1
+      # --- 検索設定 ---
+      APPFLOWY_BACKGROUND_INDEXER_ENABLED: 'true'
+      APPFLOWY_INDEXER_DATABASE_ENABLED: 'true'  # 文書内のデータベースデータをインデックス
+      APPFLOWY_KEYWORD_SEARCH_ENABLED: 'true'
+      APPFLOWY_KEYWORD_WORKER_ENABLED: 'true'
+      # キーワード検索インデックスに対応付ける仮想メモリの上限
+      APPFLOWY_KEYWORD_INDEX_MAP_SIZE_BYTES: ${APPFLOWY_KEYWORD_INDEX_MAP_SIZE_BYTES:-2147483648}
+      APPFLOWY_KEYWORD_INDEX_DIR: /var/lib/appflowy/keyword_index
+      # JWT トークン
+      APPFLOWY_GOTRUE_JWT_SECRET: $GOTRUE_JWT_SECRET
+      # Azure AI は無効: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION
+    healthcheck:
+      test: >-
+        bash -c 'exec 3<>/dev/tcp/127.0.0.1/$${APPFLOWY_SEARCH_PORT:-4002};
+        printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3;
+        read -r _ status _ <&3;
+        [ "$${status}" = 200 ]'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      cloud:
+        # 検索側が要求するスキーマ (embedding space 等) を cloud 側マイグレーションが用意するため、本体の起動完了を待つ
+        condition: service_healthy
+
+  # AI — cloud が AI_SERVER_HOST / AI_SERVER_PORT でアクセス
+  # オプションなので、起動するには `docker compose pull ai && docker compose up -d ai`
+  ai:
+    container_name: appflowy-ai
+    hostname: appflowy-ai
+    image: appflowyinc/appflowy_ai:${IMG_VER_AI:-latest}
+    restart: unless-stopped
+    profiles: [ai]
+    networks:
+      - appflowy
+    expose:
+      - ${AI_SERVER_PORT:-5001}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+      - /var/run/redis/redis.sock:/tmp/redis-server.sock:ro
+    environment:
+      TZ: $TZ
+      AI_SERVER_PORT: ${AI_SERVER_PORT:-5001}
+      # --- AI 設定 ---
+      OPENAI_API_KEY: $AI_OPENAI_API_KEY
+      OPENAI_BASE_URL: $AI_OPENAI_BASE_URL
+      DEFAULT_AI_MODEL: $DEFAULT_AI_MODEL
+      DEFAULT_AI_COMPLETION_MODEL: $DEFAULT_AI_COMPLETION_MODEL
+      # --- S3 (VersityGW) ---
+      APPFLOWY_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-appflowy}
+      APPFLOWY_S3_SECRET_KEY: $S3_SECRET_KEY
+      APPFLOWY_S3_BUCKET: appflowy
+      APPFLOWY_S3_REGION: us-east-1
+      # --- データベース 関連 ---
+      AI_DATABASE_URL: postgresql+psycopg://appflowy:${POSTGRES_PASSWORD}@localhost/appflowy?host=/tmp
+      AI_REDIS_URL: unix:///tmp/redis-server.sock?db=${REDIS_DB:-8}
+      AI_USE_MINIO: 'true'
+      AI_MINIO_URL: http://s3:7000
+      # AppFlowy の外部アクセス URL
+      AI_APPFLOWY_HOST: https://appflowy.$DOMAIN
+      # JWT トークン
+      APPFLOWY_GOTRUE_JWT_SECRET: $GOTRUE_JWT_SECRET
+      # Azure AI は無効: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION
+    healthcheck:
+      test: 'curl -fsSLx "" http://127.0.0.1:${AI_SERVER_PORT:-5001}/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      cloud:
+        condition: service_healthy
+
+  # S3 互換オブジェクトストレージ: VersityGW
+  s3:
+    container_name: appflowy-s3
+    hostname: appflowy-s3
+    image: versity/versitygw:${IMG_VER_S3:-latest}
+    restart: unless-stopped
+    networks:
+      # - default
+      - appflowy
+    command: ['--port', ':7000', 'posix', '/data']
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ${REPO_PATH:-/opt/dc}/appflowy/s3:/data:rw
+    environment:
+      TZ: $TZ
+      ROOT_ACCESS_KEY: ${S3_ACCESS_KEY:-appflowy}
+      ROOT_SECRET_KEY: $S3_SECRET_KEY
+    labels:
+      traefik.enable: true
+      traefik.http.routers.appflowy-s3-api.rule: Host(`appflowy.$DOMAIN`) && PathPrefix(`/s3-api/`)
+      traefik.http.routers.appflowy-s3-api.entrypoints: https
+      traefik.http.routers.appflowy-s3-api.service: appflowy-s3-api
+      traefik.http.routers.appflowy-s3-api.middlewares: appflowy-s3-strip,appflowy-s3-headers
+      traefik.http.services.appflowy-s3-api.loadbalancer.server.port: 7000
+      # presigned の署名対象は internal URL ( http://s3:7000/bucket/key ) なので、
+      # 式 nginx と同じく「/s3-api を除去 + Host を s3:7000 へ書換」で内部表現に戻す
+      traefik.http.middlewares.appflowy-s3-strip.stripprefix.prefixes: /s3-api
+      traefik.http.middlewares.appflowy-s3-headers.headers.customrequestheaders.Host: s3:7000
+    healthcheck:
+      test: 'wget -q -Y off -O - http://127.0.0.1:7000/ 2>&1 | grep 403'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+# https://qiita.com/ntrlmt/items/914e8f61588d469afc27
+networks:
+  appflowy:
+    name: appflowy
+    driver: bridge
+    internal: true
