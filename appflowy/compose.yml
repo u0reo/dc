@@ -1,20 +1,35 @@
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - appflowy
+  user: "1000:1000"
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    # 実測 (web 80K / admin 14.5M / 他 0)
+    - /tmp:size=64m,mode=1777
+
 services:
   # AppFlowy Web (SPA) — 公式nginx の location /
   web:
+    <<: *common
     container_name: appflowy-web
     hostname: appflowy-web
     image: appflowyinc/appflowy_web:${IMG_VER:-latest}
-    restart: unless-stopped
-    networks:
-      # - default
-      - appflowy
+    # 公式 entrypoint はイメージ内 HTML へ sed -i するため非 root では使えない
+    # sub_filter で同等の APP_CONFIG 注入をするシムに置換 (書込み先は全て /tmp tmpfs)
+    entrypoint: ["/bin/sh", "/rootless/web-entrypoint.sh"]
+    command: []
     expose:
-      - 80
+      - 8080
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      - ./rootless/web-entrypoint.sh:/rootless/web-entrypoint.sh:ro
     environment:
       TZ: $TZ
+      HOME: /tmp
       APPFLOWY_BASE_URL: https://appflowy.$DOMAIN
       APPFLOWY_GOTRUE_BASE_URL: https://appflowy.$DOMAIN/gotrue
       APPFLOWY_WS_BASE_URL: wss://appflowy.$DOMAIN/ws/v2
@@ -23,8 +38,10 @@ services:
       # 公式nginx の location / 相当 (他の PathPrefix より優先度が低く、最後にマッチ)
       traefik.http.routers.appflowy-web.rule: Host(`appflowy.$DOMAIN`)
       traefik.http.routers.appflowy-web.entrypoints: https
+      traefik.http.routers.appflowy-web.service: appflowy-web
+      traefik.http.services.appflowy-web.loadbalancer.server.port: 8080
     healthcheck:
-      test: 'bash -c "exec 3<>/dev/tcp/127.0.0.1/80 && exec 3>&-"'
+      test: 'bash -c "exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&-"'
       interval: 30s
       timeout: 5s
       retries: 3
@@ -35,20 +52,23 @@ services:
 
   # Admin Console — 公式nginx の location /console
   admin-frontend:
+    <<: *common
     container_name: appflowy-admin-frontend
     hostname: appflowy-admin-frontend
     image: appflowyinc/admin_frontend:${IMG_VER:-latest}
-    restart: unless-stopped
-    networks:
-      # - default
-      - appflowy
+    # 公式エンドポイントは root 所有 /app 直下へ sed -i するため非rootでは不可
+    # /tmp tmpfs へ apps/super をコピー後に注入するシムで代替
+    entrypoint: ["/bin/sh", "/rootless/admin-entrypoint.sh"]
+    command: []
     expose:
       - ${ADMIN_FRONTEND_PORT:-3000}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      - ./rootless/admin-entrypoint.sh:/rootless/admin-entrypoint.sh:ro
     environment:
       TZ: $TZ
+      HOME: /tmp
       # Next.js はリッスンポートのバインド先を HOSTNAME 環境変数で決定
       HOSTNAME: 0.0.0.0
       ADMIN_FRONTEND_PORT: ${ADMIN_FRONTEND_PORT:-3000}
@@ -75,13 +95,10 @@ services:
   # AppFlowy Cloud API — 公式nginx の location /api, /ws, /ai
   # https://appflowy.com/docs/How-to-install-AppFlowyCloud-using-Coolify
   cloud:
+    <<: *common
     container_name: appflowy-cloud
     hostname: appflowy-cloud
     image: appflowyinc/appflowy_cloud:${IMG_VER:-latest}
-    restart: unless-stopped
-    networks:
-      # - default
-      - appflowy
     expose:
       - 8000
     volumes:
@@ -171,13 +188,11 @@ services:
 
   # GoTrue (認証) — 公式nginx の location /gotrue/ + rewrite ^/gotrue(/.*)$ $1
   gotrue:
+    <<: *common
+    # 元々イメージ既定 USER が uid 1000 (supabase)
     container_name: appflowy-gotrue
     hostname: appflowy-gotrue
     image: appflowyinc/gotrue:${IMG_VER:-latest}
-    restart: unless-stopped
-    networks:
-      # - default
-      - appflowy
     expose:
       - ${GOTRUE_PORT:-9999}
     volumes:
@@ -244,14 +259,12 @@ services:
 
   # ============================================================ バックグラウンド (外部非公開)
   worker:
+    <<: *common
     container_name: appflowy-worker
     hostname: appflowy-worker
-    # 4KBページ前提ビルドへの16KBビルドパッチ対応
+    # 16KBページサイズパッチ適用済みイメージを使用
     # https://github.com/u0reo/appflowy-worker-builder
     image: ureo/appflowy_worker_16k:${IMG_VER:-latest}
-    restart: unless-stopped
-    networks:
-      - appflowy
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -291,12 +304,10 @@ services:
 
   # 検索 / インデクサ — cloud から http://search:$APPFLOWY_SEARCH_PORT でアクセス
   search:
+    <<: *common
     container_name: appflowy-search
     hostname: appflowy-search
     image: appflowyinc/appflowy_search:${IMG_VER_SEARCH:-latest}
-    restart: unless-stopped
-    networks:
-      - appflowy
     expose:
       - ${APPFLOWY_SEARCH_PORT:-4002}
     volumes:
@@ -353,13 +364,11 @@ services:
   # AI — cloud が AI_SERVER_HOST / AI_SERVER_PORT でアクセス
   # オプションなので、起動するには `docker compose pull ai && docker compose up -d ai`
   ai:
+    <<: *common
     container_name: appflowy-ai
     hostname: appflowy-ai
     image: appflowyinc/appflowy_ai:${IMG_VER_AI:-latest}
-    restart: unless-stopped
     profiles: [ai]
-    networks:
-      - appflowy
     expose:
       - ${AI_SERVER_PORT:-5001}
     volumes:
@@ -369,6 +378,7 @@ services:
       - /var/run/redis/redis.sock:/tmp/redis-server.sock:ro
     environment:
       TZ: $TZ
+      HOME: /tmp
       AI_SERVER_PORT: ${AI_SERVER_PORT:-5001}
       # --- AI 設定 ---
       OPENAI_API_KEY: $AI_OPENAI_API_KEY
@@ -402,13 +412,10 @@ services:
 
   # S3 互換オブジェクトストレージ: VersityGW
   s3:
+    <<: *common
     container_name: appflowy-s3
     hostname: appflowy-s3
     image: versity/versitygw:${IMG_VER_S3:-latest}
-    restart: unless-stopped
-    networks:
-      # - default
-      - appflowy
     command: ['--port', ':7000', 'posix', '/data']
     volumes:
       - /etc/localtime:/etc/localtime:ro

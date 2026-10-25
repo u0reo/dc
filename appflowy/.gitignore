@@ -1,0 +1,3 @@
+!rootless/*
+# ローカル作業用バックアップ (公開対象外)
+compose.yml.bak*
