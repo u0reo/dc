@@ -1,10 +1,25 @@
+x-common: &common
+  restart: unless-stopped
+  user: "1000:1000"
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  cap_drop:
+    - ALL
+
 services:
   adguardhome:
+    <<: *common
     container_name: adguardhome
     hostname: adguardhome
     image: adguard/adguardhome:latest
-    restart: unless-stopped
     network_mode: bridge
+    cap_add:
+      # 53 (DNS) / 80 (Dashboard 用 http, Traefik 向け) / 853 (DoT/DoQ) をリッスンするため
+      - NET_BIND_SERVICE
+    group_add:
+      # /etc/certificates/{certs,private} (group: certs) を読み取り
+      - "${CERTS_GID:-200}"
     ports:
       - 53:53/tcp
       - 53:53/udp
@@ -14,9 +29,9 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /etc/certificates:/etc/certificates:ro
-      - /opt/dc/adguardhome/configs:/opt/adguardhome/conf:rw
-      - /opt/dc/adguardhome/data:/opt/adguardhome/work:rw
+      - ${REPO_PATH:-/opt/dc}/traefik/certificates:/etc/certificates:ro
+      - ${REPO_PATH:-/opt/dc}/adguardhome/configs:/opt/adguardhome/conf:rw
+      - ${REPO_PATH:-/opt/dc}/adguardhome/data:/opt/adguardhome/work:rw
     labels:
       traefik.enable: true
       traefik.http.routers.dns.rule: Host(`dns.$DOMAIN`)
@@ -26,16 +41,14 @@ services:
       adguardhome-autoheal: true
     healthcheck:
       # DNS の実動作確認のみ、正しい DNS クエリ（A example.com）を UDP:53 に送信
-      test:
-        - 'CMD-SHELL'
-        - |
-          netstat -tln | grep -q ':53[[:space:]]' &&
-          netstat -tln | grep -q ':80[[:space:]]' &&
-          netstat -tln | grep -q ':853[[:space:]]' &&
-          netstat -tln | grep -q ':8443[[:space:]]' &&
-          netstat -uln | grep -qE '[:.]53[[:space:]]' &&
-          netstat -uln | grep -qE '[:.]853[[:space:]]' &&
-          nslookup example.localhost localhost >/dev/null 2>&1
+      test: >-
+        netstat -tln | grep -q ':53[[:space:]]' &&
+        netstat -tln | grep -q ':80[[:space:]]' &&
+        netstat -tln | grep -q ':853[[:space:]]' &&
+        netstat -tln | grep -q ':8443[[:space:]]' &&
+        netstat -uln | grep -qE '[:.]53[[:space:]]' &&
+        netstat -uln | grep -qE '[:.]853[[:space:]]' &&
+        nslookup example.localhost localhost >/dev/null 2>&1
       interval: 30s
       timeout: 3s
       retries: 3
@@ -43,17 +56,20 @@ services:
 
   # healthcheck が unhealthy になったコンテナを自動で再起動する
   autoheal:
+    <<: *common
     container_name: adguardhome-autoheal
     hostname: adguardhome-autoheal
     image: willfarrell/autoheal:latest
-    restart: unless-stopped
     network_mode: none
+    group_add:
+      # /var/run/docker.sock (root:docker 660) を参照
+      - "${DOCKER_GID:-992}"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      # 監視対象はをラベルで絞り込み
+      # 監視対象をラベルで絞り込み
       AUTOHEAL_CONTAINER_LABEL: adguardhome-autoheal
       # 監視間隔（秒）
       AUTOHEAL_INTERVAL: 30
@@ -62,7 +78,7 @@ services:
       # 監視対象が停止中でも再起動するかどうか
       AUTOHEAL_ONLY_MONITOR_RUNNING: true
     healthcheck:
-      test: [ 'CMD-SHELL', 'grep -qa "autoheal" /proc/1/cmdline && test -S /var/run/docker.sock' ]
+      test: 'grep -qa "autoheal" /proc/1/cmdline && test -S /var/run/docker.sock'
       interval: 30s
       timeout: 5s
       retries: 3
