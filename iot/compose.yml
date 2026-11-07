@@ -48,7 +48,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 10s
     depends_on:
       - esphome
 
@@ -83,6 +83,12 @@ services:
       traefik.http.routers.esphome.entrypoints: https
       traefik.http.routers.esphome.service: esphome
       traefik.http.services.esphome.loadbalancer.server.port: 6052
+    healthcheck:
+      test: 'curl -fsSL http://localhost:6052/version -A "HealthCheck"'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
   mosquitto:
     <<: *common
@@ -107,7 +113,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 3s
 
   node-red:
     <<: *common
@@ -128,6 +134,12 @@ services:
       traefik.http.routers.nodered.rule: Host(`nodered.${DOMAIN:?}`)
       traefik.http.routers.nodered.entrypoints: https
       traefik.http.routers.nodered.middlewares: authelia@docker
+    healthcheck:
+      test: node /healthcheck.js
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
 
 networks:
   # IoT 用 VLAN 上の macvlan
