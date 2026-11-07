@@ -31,7 +31,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
-      - /opt/dc/iot/hass:/config:rw
+      - ${REPO_PATH:-/opt/dc}/iot/hass:/config:rw
     cap_add:
       # Bluetooth アダプタ管理 (habluetooth の mgmt ソケット操作)
       # カーネルが Bluetooth mgmt ソケットに対し CAP_NET_ADMIN と CAP_NET_RAW の 両方を要求
@@ -39,7 +39,7 @@ services:
       - NET_RAW
     labels:
       traefik.enable: true
-      traefik.http.routers.hass.rule: Host(`hass.$DOMAIN`)
+      traefik.http.routers.hass.rule: Host(`hass.${DOMAIN:?}`)
       traefik.http.routers.hass.entrypoints: https
       traefik.http.routers.hass.service: hass
       traefik.http.services.hass.loadbalancer.server.port: 8123
@@ -57,27 +57,32 @@ services:
     container_name: esphome
     hostname: esphome
     image: ghcr.io/esphome/esphome:latest
-    network_mode: bridge
+    mac_address: 02:00:00:00:60:52
+    networks:
+      macvlan:
+        ipv4_address: ${MACVLAN_ESPHOME:?}
     expose:
       - 6052
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /opt/dc/iot/esphome:/config:rw
-      - /opt/dc/iot/esphome/.cache:/.cache:rw
-      - /opt/dc/iot/esphome/.platformio:/.platformio:rw
-      - /opt/dc/iot/esphome/hosts:/etc/hosts:ro
+      - ${REPO_PATH:-/opt/dc}/iot/esphome:/config:rw
+      - ${REPO_PATH:-/opt/dc}/iot/esphome/.cache:/.cache:rw
+      - ${REPO_PATH:-/opt/dc}/iot/esphome/.platformio:/.platformio:rw
+      - ${REPO_PATH:-/opt/dc}/iot/esphome/hosts:/etc/hosts:ro
     cap_add:
       # ダッシュボード上の「Ping」機能で各デバイスのオンライン確認する際に ICMP パケットを送信するため
       - NET_RAW
     environment:
       ESPHOME_DASHBOARD_USE_PING: true
-      USERNAME: $ESPHOME_USERNAME
-      PASSWORD: $ESPHOME_PASSWORD
+      ESPHOME_USERNAME: ${ESPHOME_USERNAME:?}
+      ESPHOME_PASSWORD: ${ESPHOME_PASSWORD:?}
     labels:
       traefik.enable: true
-      traefik.http.routers.esphome.rule: Host(`esphome.$DOMAIN`)
+      traefik.http.routers.esphome.rule: Host(`esphome.${DOMAIN:?}`)
       traefik.http.routers.esphome.entrypoints: https
+      traefik.http.routers.esphome.service: esphome
+      traefik.http.services.esphome.loadbalancer.server.port: 6052
 
   mosquitto:
     <<: *common
@@ -85,15 +90,18 @@ services:
     hostname: mosquitto
     image: eclipse-mosquitto:alpine
     user: 1883:1883  # mosquitto ユーザー
-    network_mode: bridge
+    mac_address: 02:00:00:00:18:83
+    networks:
+      macvlan:
+        ipv4_address: ${MACVLAN_MOSQUITTO:?}
     ports:
       - 1883:1883/tcp # MQTT
       # - 9001:9001/tcp # MQTT via WebSocket
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /opt/dc/iot/mosquitto:/mosquitto:rw
-      - /opt/dc/iot/mosquitto/config:/mosquitto/config:ro
+      - ${REPO_PATH:-/opt/dc}/iot/mosquitto:/mosquitto:rw
+      - ${REPO_PATH:-/opt/dc}/iot/mosquitto/config:/mosquitto/config:ro
     healthcheck:
       test: mosquitto_pub -h localhost -p 1883 -t healthcheck/ping -m ping
       interval: 30s
@@ -112,11 +120,23 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /opt/dc/iot/nodered:/data:rw
+      - ${REPO_PATH:-/opt/dc}/iot/nodered:/data:rw
     depends_on:
       - mosquitto
     labels:
       traefik.enable: true
-      traefik.http.routers.nodered.rule: Host(`nodered.$DOMAIN`)
+      traefik.http.routers.nodered.rule: Host(`nodered.${DOMAIN:?}`)
       traefik.http.routers.nodered.entrypoints: https
       traefik.http.routers.nodered.middlewares: authelia@docker
+
+networks:
+  # IoT 用 VLAN 上の macvlan
+  # traefik (host モード) からの到達は host 側の macvlan shim 経由
+  macvlan:
+    driver: macvlan
+    driver_opts:
+      parent: ${MACVLAN_PARENT:?}
+    ipam:
+      config:
+        - subnet: ${MACVLAN_SUBNET:?}
+          gateway: ${MACVLAN_GATEWAY:?}
