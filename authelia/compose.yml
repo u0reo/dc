@@ -1,9 +1,21 @@
+x-common: &common
+  restart: unless-stopped
+  user: 1000:1000
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  cap_drop:
+    - ALL
+  tmpfs:
+    # Goランタイムの一時ファイル用 (ソケットのバインド先より深いパスなので同居可)
+    - /tmp:size=64m,mode=1777
+
 services:
   authelia:
+    <<: *common
     container_name: authelia
     hostname: authelia
     image: authelia/authelia:4
-    restart: unless-stopped
     network_mode: bridge
     ports:
       - 172.17.0.1:9091:9091/tcp # Dockerのブリッジインターフェースのゲートウェイに対しポート開放
@@ -13,7 +25,8 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysqld.sock:ro
       - /run/redis/redis.sock:/tmp/redis.sock:ro
-      - /opt/dc/authelia:/opt:ro
+      - ${REPO_PATH:-/opt/dc}/authelia:/opt:ro
+      - ${REPO_PATH:-/opt/dc}/authelia/healthcheck.env:/app/.healthcheck.env:rw  # read_only 対策
     labels:
       traefik.enable: true
       traefik.http.routers.auth.rule: Host(`auth.$DOMAIN`)
@@ -35,4 +48,10 @@ services:
       AUTHELIA_STORAGE_MYSQL_USERNAME: authelia
       AUTHELIA_DEFAULT_2FA_METHOD: webauthn  # デフォルトの2FAメソッドはWebAuthn
       AUTHELIA_THEME: auto  # 背景色をシステム設定に合わせる
-      AUTHELIA_NTP_ADDRESS: udp://$NTP_ADDRESS
+      AUTHELIA_NTP_DISABLE_STARTUP_CHECK: true  # NTP による起動時の時刻精度チェック (±3秒) を省略
+    healthcheck:
+      test: /app/healthcheck.sh
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s  # デフォルト1分
