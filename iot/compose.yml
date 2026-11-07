@@ -1,10 +1,29 @@
+x-common: &common
+  restart: unless-stopped
+  user: 1000:1000
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp
+
 services:
   homeassistant:
+    <<: *common
     container_name: homeassistant
     hostname: homeassistant
     image: ghcr.io/home-assistant/home-assistant:stable
-    restart: unless-stopped
-    network_mode: host # ブロードキャスト対応
+    # Bluetooth アダプタ管理 (自動リカバリ) のため実効 capability が必要
+    # (Docker は非 root ユーザーには cap_add を bounding (上限) しか付与せず、 effective (実効) には付与しない)
+    user: 0:0
+    read_only: true
+    tmpfs:
+      - /tmp
+      # /run は s6 のスーパーバイザーツリー置き場 (tmpfs のデフォルトオーナーは root)
+      - /run:mode=0755,exec
+    network_mode: host  # ブロードキャスト対応
     expose:
       - 8123
     volumes:
@@ -14,8 +33,10 @@ services:
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
       - /opt/dc/iot/hass:/config:rw
     cap_add:
+      # Bluetooth アダプタ管理 (habluetooth の mgmt ソケット操作)
+      # カーネルが Bluetooth mgmt ソケットに対し CAP_NET_ADMIN と CAP_NET_RAW の 両方を要求
       - NET_ADMIN
-      - SYS_ADMIN
+      - NET_RAW
     labels:
       traefik.enable: true
       traefik.http.routers.hass.rule: Host(`hass.$DOMAIN`)
@@ -23,7 +44,7 @@ services:
       traefik.http.routers.hass.service: hass
       traefik.http.services.hass.loadbalancer.server.port: 8123
     healthcheck:
-      test: ['CMD-SHELL', 'curl -fsSL http://localhost:8123']
+      test: 'curl -fsSL http://localhost:8123'
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,11 +53,10 @@ services:
       - esphome
 
   esphome:
+    <<: *common
     container_name: esphome
     hostname: esphome
     image: ghcr.io/esphome/esphome:latest
-    restart: unless-stopped
-    user: 1000:1000
     network_mode: bridge
     expose:
       - 6052
@@ -47,6 +67,9 @@ services:
       - /opt/dc/iot/esphome/.cache:/.cache:rw
       - /opt/dc/iot/esphome/.platformio:/.platformio:rw
       - /opt/dc/iot/esphome/hosts:/etc/hosts:ro
+    cap_add:
+      # ダッシュボード上の「Ping」機能で各デバイスのオンライン確認する際に ICMP パケットを送信するため
+      - NET_RAW
     environment:
       ESPHOME_DASHBOARD_USE_PING: true
       USERNAME: $ESPHOME_USERNAME
@@ -57,10 +80,11 @@ services:
       traefik.http.routers.esphome.entrypoints: https
 
   mosquitto:
+    <<: *common
     container_name: mosquitto
     hostname: mosquitto
-    image: eclipse-mosquitto:2
-    restart: unless-stopped
+    image: eclipse-mosquitto:alpine
+    user: 1883:1883  # mosquitto ユーザー
     network_mode: bridge
     ports:
       - 1883:1883/tcp # MQTT
@@ -71,17 +95,17 @@ services:
       - /opt/dc/iot/mosquitto:/mosquitto:rw
       - /opt/dc/iot/mosquitto/config:/mosquitto/config:ro
     healthcheck:
-      test: ['CMD-SHELL', 'mosquitto_pub -h localhost -p 1883 -t "healthcheck/ping" -m "ping"']
+      test: mosquitto_pub -h localhost -p 1883 -t healthcheck/ping -m ping
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
   node-red:
+    <<: *common
     container_name: nodered
     hostname: nodered
-    image: nodered/node-red:latest-22-minimal
-    restart: unless-stopped
+    image: nodered/node-red:latest-minimal
     network_mode: bridge
     expose:
       - 1880
