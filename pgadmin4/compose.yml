@@ -1,0 +1,52 @@
+x-common: &common
+  restart: unless-stopped
+  user: 1000:1000
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+    
+services:
+  pgadmin4:
+    <<: *common
+    container_name: pgadmin4
+    hostname: pgadmin4
+    image: dpage/pgadmin4:latest
+    network_mode: bridge
+    user: 5050:5050  # イメージ既定の USER=pgadmin
+    expose:
+      - ${PORT:-8080}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/postgresql/.s.PGSQL.5432:/tmp/.s.PGSQL.5432:ro
+      - ${REPO_PATH:-/opt/dc}/pgadmin4/data:/var/lib/pgadmin:rw
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin4@pgadmin.org
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      # sudo(root) を要する postfix 起動は non-root では不可能なので明示的に無効化
+      PGADMIN_DISABLE_POSTFIX: 'True'
+      PGADMIN_LISTEN_PORT: ${PORT:-8080}
+      # read_only 対策 (中身は entrypoint が自動生成)
+      PGADMIN_CUSTOM_CONFIG_DISTRO_FILE: /tmp/config_distro.py
+    labels:
+      traefik.enable: true
+      traefik.http.routers.pgadmin4.rule: Host(`pgadmin4.$DOMAIN`)
+      traefik.http.routers.pgadmin4.entrypoints: https
+      traefik.http.routers.pgadmin4.middlewares: authelia@docker
+      traefik.http.routers.pgadmin4.service: pgadmin4
+      # favicon.ico などの静的リソースは Authelia 認証を通さずにアクセス可能に
+      traefik.http.routers.pgadmin4-public.rule: 'Host(`pgadmin4.$DOMAIN`) && (Path(`/favicon.ico`) || Path(`/static/favicon.ico`) || Path(`/misc/ping`))'
+      traefik.http.routers.pgadmin4-public.entrypoints: https
+      traefik.http.routers.pgadmin4-public.service: pgadmin4
+      traefik.http.services.pgadmin4.loadbalancer.server.port: ${PORT:-8080}
+    healthcheck:
+      test: 'wget -q -O - http://localhost:${PORT:-8080}/misc/ping'
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
