@@ -1,63 +1,48 @@
+x-common: &common
+  restart: unless-stopped
+  user: 1000:1000
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
 services:
   vaultwarden:
+    <<: *common
     container_name: vaultwarden
     hostname: vaultwarden
     image: vaultwarden/server:alpine
-    restart: unless-stopped
     network_mode: bridge
     expose:
-      - 80
-      - 3012
+      - 8080
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /run/mysqld/mysqld.sock:/tmp/mysql.sock:ro
-      - $DATA_PATH:/data:rw
+      - ${REPO_PATH:-/opt/dc}/vaultwarden/data:/data:rw
     environment:
-      WEBSOCKET_ENABLED: true
+      ROCKET_PORT: 8080  # 80 のままでは non-root で bind できないため 8080 へ変更
       DATABASE_URL: $DATABASE_URL
       DOMAIN: https://vw.$DOMAIN
       SMTP_HOST: $SMTP_HOST
-      SMTP_FROM: $SMTP_FROM
+      SMTP_FROM: no-reply@vw.$DOMAIN
       SMTP_PORT: 465
       SMTP_SECURITY: force_tls
       SMTP_USERNAME: $SMTP_USERNAME
       SMTP_PASSWORD: $SMTP_PASSWORD
     labels:
       traefik.enable: true
-      traefik.http.routers.vw.rule: 'Host(`vw.$DOMAIN`) || Host(`vw.$DOMAIN`) && Path(`/notifications/hub/negotiate`)'
+      # Vaultwarden 1.34+ は WebSocket (/notifications/hub) を同一ポートで提供
+      traefik.http.routers.vw.rule: 'Host(`vw.$DOMAIN`)'
       traefik.http.routers.vw.entrypoints: https
-      traefik.http.routers.vw.tls: true
       traefik.http.routers.vw.service: vw
-      traefik.http.services.vw.loadbalancer.server.port: 80
-      # WebSocket Support (https://github.com/dani-garcia/vaultwarden/wiki/Enabling-WebSocket-notifications)
-      traefik.http.routers.vw-ws.rule: 'Host(`vw.$DOMAIN`) && Path(`/notifications/hub`)'
-      traefik.http.routers.vw-ws.entrypoints: https
-      traefik.http.routers.vw-ws.tls: true
-      traefik.http.routers.vw-ws.service: vw-ws
-      traefik.http.services.vw-ws.loadbalancer.server.port: 3012
+      traefik.http.services.vw.loadbalancer.server.port: 8080
     healthcheck:
-      test: ['CMD-SHELL', '/healthcheck.sh']
+      test: '/healthcheck.sh'
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-
-  # vaultwarden-backup:
-  #   # https://registry.hub.docker.com/r/bruceforce/vaultwarden-backup
-  #   container_name: vaultwarden-backup
-  #   image: bruceforce/vaultwarden-backup:latest
-  #   restart: on-failure
-  #   network_mode: none
-  #   depends_on:
-  #     - vaultwarden
-  #   volumes:
-  #     - vaultwarden-data:/data:ro
-  #     - /var/backup/vaultwarden:/backup:rw
-  #     - /etc/timezone:/etc/timezone:ro
-  #     - /etc/localtime:/etc/localtime:ro
-  #   environment:
-  #     BACKUP_ADD_DATABASE: false
-  #     BACKUP_DIR: /backup
-  #     TIMESTAMP: true
-  #     DELETE_AFTER: 30
+      start_period: 3s
