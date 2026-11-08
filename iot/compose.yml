@@ -18,7 +18,6 @@ services:
     # Bluetooth アダプタ管理 (自動リカバリ) のため実効 capability が必要
     # (Docker は非 root ユーザーには cap_add を bounding (上限) しか付与せず、 effective (実効) には付与しない)
     user: 0:0
-    read_only: true
     tmpfs:
       - /tmp
       # /run は s6 のスーパーバイザーツリー置き場 (tmpfs のデフォルトオーナーは root)
@@ -106,8 +105,9 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ${REPO_PATH:-/opt/dc}/iot/mosquitto:/mosquitto:rw
       - ${REPO_PATH:-/opt/dc}/iot/mosquitto/config:/mosquitto/config:ro
+      - ${REPO_PATH:-/opt/dc}/iot/mosquitto/data:/mosquitto/data:rw
+      - ${REPO_PATH:-/opt/dc}/iot/mosquitto/log:/mosquitto/log:rw
     healthcheck:
       test: mosquitto_pub -h localhost -p 1883 -t healthcheck/ping -m ping
       interval: 30s
